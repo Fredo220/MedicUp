@@ -77,15 +77,15 @@ class LLMClient:
         reasoning_effort: Optional[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
     ) -> LLMResult:
-        """Call LLM via OpenRouter.
+        """Call an OpenAI-compatible chat endpoint (Nebius Token Factory by default).
 
         Args:
             max_tokens: max_completion_tokens (includes reasoning tokens for reasoning models).
             reasoning_effort: "low" | "medium" | "high" | None.
                 For lightweight tasks (Y/N, keywords), use "low" to minimize reasoning overhead.
-            provider: OpenRouter provider routing (e.g. "google-vertex").
+            provider: OpenRouter-only provider routing (e.g. "google-vertex").
         """
-        default_prov = self.cfg.get("default_provider", "openrouter")
+        default_prov = self.cfg.get("default_provider", "nebius")
         prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
         base = str(prov_cfg.get("base_url", "")).rstrip("/")
         key = prov_cfg.get("api_key", "")
@@ -102,10 +102,11 @@ class LLMClient:
             "messages": messages,
             "max_completion_tokens": max_tokens,
         }
-        if provider:
-            body["provider"] = {"order": [provider], "allow_fallbacks": False}
-        if reasoning_effort:
-            body["reasoning"] = {"effort": reasoning_effort}
+        if default_prov == "openrouter":
+            if provider:
+                body["provider"] = {"order": [provider], "allow_fallbacks": False}
+            if reasoning_effort:
+                body["reasoning"] = {"effort": reasoning_effort}
 
         t0 = time.perf_counter()
         last_err = ""
@@ -170,6 +171,51 @@ class LLMClient:
                 await asyncio.sleep(self._delay(attempt))
 
         raise RuntimeError(f"LLM '{step}' failed after {self._retries} retries: {last_err}")
+
+    async def embed(self, texts: List[str], model: str) -> List[List[float]]:
+        """Create OpenAI-compatible embeddings in bounded batches."""
+        default_prov = self.cfg.get("default_provider", "nebius")
+        prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
+        base = str(prov_cfg.get("base_url", "")).rstrip("/")
+        key = prov_cfg.get("api_key", "")
+        if not base or not key:
+            raise RuntimeError(f"LLM provider '{default_prov}' missing base_url or api_key")
+        semaphore = asyncio.Semaphore(4)
+
+        async def embed_batch(start: int, batch: List[str]) -> List[List[float]]:
+            last_err = ""
+            for attempt in range(self._retries):
+                try:
+                    async with semaphore:
+                        async with httpx.AsyncClient(timeout=120.0) as client:
+                            response = await client.post(
+                                f"{base}/embeddings",
+                                headers={"Authorization": f"Bearer {key}"},
+                                json={"model": model, "input": batch},
+                            )
+                            response.raise_for_status()
+                            data = response.json()
+                    indexed = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
+                    batch_vectors = [item.get("embedding", []) for item in indexed]
+                    if len(batch_vectors) != len(batch) or any(not vector for vector in batch_vectors):
+                        raise RuntimeError("embedding response did not match input batch")
+                    return batch_vectors
+                except Exception as exc:
+                    last_err = str(exc)
+                    log.warning("[LLM embeddings] batch %d attempt %d: %s", start // 32 + 1, attempt + 1, last_err)
+                    if attempt < self._retries - 1:
+                        await asyncio.sleep(self._delay(attempt))
+            raise RuntimeError(f"LLM embeddings failed after {self._retries} retries: {last_err}")
+
+        batches = [
+            texts[start:start + 32]
+            for start in range(0, len(texts), 32)
+        ]
+        results = await asyncio.gather(*(
+            embed_batch(start, batch)
+            for start, batch in zip(range(0, len(texts), 32), batches)
+        ))
+        return [vector for batch_vectors in results for vector in batch_vectors]
 
     def _delay(self, attempt: int) -> float:
         return float(self._backoff[min(attempt, len(self._backoff) - 1)]) if self._backoff else 2.0

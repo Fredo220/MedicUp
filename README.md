@@ -1,3 +1,18 @@
+# MedicUp
+
+Evidence-based medical literature search engine with cited answers and follow-up questions.
+Built on [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) (MIT) and powered by [Nebius Token Factory](https://tokenfactory.nebius.com).
+
+Quick start:
+
+```bash
+cp .env_template .env   # add NEBIUS_API_KEY
+pip install -e .
+openoe --port 8000      # open http://localhost:8000
+```
+
+---
+
 <div align="center">
 
 # 🏥 OpenOE-Lite
@@ -160,6 +175,17 @@ Models are accessed via [OpenRouter](https://openrouter.ai/models) — swap any 
 | `GET` | `/api/config` | Current config (redacted) |
 | `GET` | `/api/traces/{id}` | Execution trace |
 | `GET` | `/health` | Health check |
+
+### 🚢 Deploy on Nebius (Draft — to finalize)
+
+Build and push the image to Nebius Container Registry (authenticate Docker with your registry credentials first):
+
+```bash
+docker build -t cr.<region>.nebius.cloud/<registry-id>/medicup:<tag> .
+docker push cr.<region>.nebius.cloud/<registry-id>/medicup:<tag>
+```
+
+Create a Nebius Serverless AI endpoint from this image, configure its container port as `8000`, and provide `NEBIUS_API_KEY`, `TAVILY_API_KEY`, `OPENALEX_EMAIL`, and `OPENALEX_API_KEY` as secret environment variables. Do not bake credentials into the image.
 
 ### 📁 Project Structure
 

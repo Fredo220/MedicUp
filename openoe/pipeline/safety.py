@@ -42,4 +42,4 @@ async def check_safety(
         return {"flag": data.get("flag", "unsafe"), "reason": data.get("reason", "")}
     except Exception as e:
         log.warning("Safety check failed: %s — defaulting to unsafe", e)
-        return {"flag": "unsafe", "reason": f"安全检查异常: {e}"}
+        return {"flag": "unsafe", "reason": f"Safety check error: {e}"}

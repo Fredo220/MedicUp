@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="icon" href="/static/brand/favicon.png">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MedicUp · dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7f9;--surface:#fff;--sunken:#f0f2f5;--border:#e1e4e8;--border-strong:#c9ced6;
+  --text:#16191d;--muted:#5f6772;--faint:#8b929c;
+  --accent:#2563eb;--accent-bg:#e8effd;
+  --ok:#15803d;--ok-bg:#e7f5ec;--warn:#b45309;--warn-bg:#fdf3e4;--err:#c62828;--err-bg:#fdecec;
+  --g:#2563eb;--s:#0d9488;--l:#7c3aed;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1014;--surface:#14181e;--sunken:#0f1317;--border:#262c35;--border-strong:#39414c;
+  --text:#e5e8ec;--muted:#9aa2ad;--faint:#6b737e;
+  --accent:#5b8cff;--accent-bg:#17233d;
+  --ok:#4ade80;--ok-bg:#12261a;--warn:#f0b35a;--warn-bg:#2b2112;--err:#f87171;--err-bg:#2c1515;
+  --g:#5b8cff;--s:#2dd4bf;--l:#a78bfa;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1014;--surface:#14181e;--sunken:#0f1317;--border:#262c35;--border-strong:#39414c;
+  --text:#e5e8ec;--muted:#9aa2ad;--faint:#6b737e;
+  --accent:#5b8cff;--accent-bg:#17233d;
+  --ok:#4ade80;--ok-bg:#12261a;--warn:#f0b35a;--warn-bg:#2b2112;--err:#f87171;--err-bg:#2c1515;
+  --g:#5b8cff;--s:#2dd4bf;--l:#a78bfa;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body{font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.mono{font-family:var(--mono);font-size:12px}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.top-in{display:flex;align-items:center;gap:16px;padding:0 16px;height:48px;overflow-x:auto;scrollbar-width:none}
+.brand{font-weight:600;font-size:14px;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.brand svg{width:16px;height:16px;color:var(--accent)}
+.runid{white-space:nowrap}
+.stages{display:flex;gap:4px;margin-left:auto}
+.stg{display:flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.stg i{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.stg.ok i{background:var(--ok)}.stg.warn i{background:var(--warn)}.stg.run i{background:var(--accent);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.iconbtn{border:1px solid var(--border);background:var(--surface);border-radius:4px;height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.iconbtn:hover{border-color:var(--border-strong)}
+
+/* query */
+.query{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) auto;gap:12px;align-items:start}
+@media(max-width:900px){.query{grid-template-columns:minmax(0,1fr)}}
+.query label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.query label span{text-transform:none;letter-spacing:0}
+.query input,.query textarea{width:100%;border:1px solid var(--border);border-radius:4px;background:var(--sunken);padding:7px 10px;font-size:12.5px}
+.query input{height:36px}
+.query textarea{resize:vertical;min-height:60px;font-family:var(--mono);line-height:1.6}
+.query input:focus,.query textarea:focus{border-color:var(--accent);outline:none}
+.hint{font-size:11.5px;color:var(--faint);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px}
+.qact{padding-top:19px}
+@media(max-width:900px){.qact{padding-top:0}}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn{height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.btn kbd{font-family:var(--mono);font-size:10px;opacity:.75;border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 4px}
+.demo{grid-column:1/-1;font-size:11px;color:var(--warn)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 140px)}
+@media(max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.side{border-right:1px solid var(--border);background:var(--surface);min-width:0}
+@media(max-width:900px){.side{border-right:0;border-bottom:1px solid var(--border)}}
+.sec{border-bottom:1px solid var(--border);padding:12px 16px}
+.sec h3{margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.sec h3 span{font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--mono)}
+.seedrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;padding:5px 0;border-top:1px solid var(--border);align-items:start}
+.seedrow:first-of-type{border-top:0}
+.seedrow b{font-weight:500;display:block;line-height:1.35}
+.seedrow small{color:var(--muted);font-size:11px}
+.seedrow.hl{background:var(--accent-bg);margin:0 -16px;padding-inline:16px}
+.seedrow code{font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere;display:block}
+.seedrow .acts{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.pick{border:1px solid var(--border);background:var(--surface);border-radius:4px;padding:3px 7px;text-align:left;font-size:11.5px;line-height:1.35}
+.pick:hover{border-color:var(--accent);color:var(--accent)}
+.pick .faint{font-family:var(--mono);font-size:10.5px}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-size:11.5px;align-self:flex-start}
+.alert[hidden]{display:none}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:3px;font-family:var(--mono);font-size:10.5px;border:1px solid var(--border);color:var(--muted);background:var(--sunken);white-space:nowrap}
+.badge.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.badge.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.badge.err{color:var(--err);background:var(--err-bg);border-color:transparent}
+.badge.acc{color:var(--accent);background:var(--accent-bg);border-color:transparent}
+.badge.g{color:var(--g)}.badge.s{color:var(--s)}.badge.l{color:var(--l)}
+.alert{border:1px solid var(--warn);background:var(--warn-bg);color:var(--text);border-radius:4px;padding:6px 8px;font-size:12px;margin-bottom:8px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:12px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;display:flex;flex-wrap:wrap;gap:4px}
+.hist{display:flex;align-items:flex-end;gap:2px;height:32px}
+.hist span{flex:1;background:var(--border-strong);border-radius:1px}
+.wt{display:grid;grid-template-columns:72px minmax(0,1fr) 36px;gap:8px;align-items:center;font-size:12px;margin-bottom:6px}
+.wt input{width:100%;accent-color:var(--accent)}
+.wt i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+/* main */
+.main{min-width:0;padding:0 16px 32px}
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:48px;background:var(--bg);z-index:10}
+.tab{border:0;background:none;padding:10px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+.tab .count{font-family:var(--mono);font-size:10.5px;background:var(--sunken);border:1px solid var(--border);border-radius:3px;padding:0 5px;color:var(--muted)}
+.panel{padding-top:12px}.panel[hidden]{display:none}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.toolbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.chk{height:26px;padding:0 9px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.chk[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.toolbar .right{margin-left:auto}
+.diff{display:none;align-items:center;gap:10px;border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--surface);border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:12px}
+.diff.show{display:flex}
+.diff button{margin-left:auto;border:0;background:none;color:var(--accent)}
+
+/* table */
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--sunken);white-space:nowrap;position:relative}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child>td{border-bottom:0}
+.res{min-width:880px}
+.res tr.row:hover>td{background:var(--sunken)}
+.res tr.row.acc>td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+.res tr.row.rej{opacity:.45}
+.res tr.row.flag>td:first-child{box-shadow:inset 3px 0 0 var(--err)}
+.res .t{font-weight:500;line-height:1.35}
+.res .au{color:var(--muted);font-size:12px}
+.delta.up{color:var(--ok)}.delta.down{color:var(--err)}
+.sbar{display:flex;height:6px;width:110px;border-radius:2px;overflow:hidden;background:var(--sunken);margin-top:5px}
+.sbar span{height:100%}
+.chev{border:0;background:none;color:var(--muted);width:22px;height:22px;border-radius:3px;display:inline-grid;place-items:center}
+.chev:hover{background:var(--sunken);color:var(--text)}
+.chev svg{width:14px;height:14px;transition:transform .15s}
+.chev[aria-expanded="true"] svg{transform:rotate(90deg)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--surface);height:24px;padding:0 8px;font-size:11.5px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on.a{background:var(--ok-bg);color:var(--ok)}
+.seg button.on.r{background:var(--err-bg);color:var(--err)}
+tr.detail>td{background:var(--sunken);padding:0}
+.det{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;padding:12px 14px 14px 48px}
+@media(max-width:1100px){.det{grid-template-columns:minmax(0,1fr);padding-left:14px}}
+.det h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.det p{margin:0 0 10px;max-width:72ch}
+.det q{font-style:italic}
+.sref{color:var(--accent);border-bottom:1px dotted var(--accent);cursor:help;font-family:var(--mono);font-size:12px}
+.comp{width:100%;font-size:12px;margin-bottom:10px}
+.comp td,.comp th{padding:4px 8px;background:none}
+.comp td:not(:first-child),.comp th:not(:first-child){text-align:right}
+pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px;font:11.5px/1.55 var(--mono);overflow:auto;max-height:280px;white-space:pre}
+.tk{color:var(--l)}.ts{color:var(--s)}.tn{color:var(--g)}.tc{color:var(--faint)}
+
+/* graph */
+.card{border:1px solid var(--border);border-radius:6px;background:var(--surface);position:relative;overflow:hidden}
+.card-h{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.card-h i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+#graph{display:block;width:100%;height:auto}
+#graph .edge{pointer-events:none;fill:none;stroke:var(--border-strong);stroke-width:.8;stroke-opacity:.45;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.1s cubic-bezier(.3,.7,.3,1) forwards;transition:stroke-opacity .2s,opacity .2s,stroke-width .2s}
+#graph .edge.main{stroke-width:1.2;stroke-opacity:.8;stroke:color-mix(in srgb,var(--accent) 28%,var(--border-strong))}
+#graph .edge.hot{stroke:color-mix(in srgb,var(--accent) 45%,var(--surface));stroke-width:1.6;stroke-opacity:.9;opacity:1;stroke-dasharray:none;stroke-dashoffset:0;animation:none}
+#graph.focus .edge:not(.hot){opacity:.08}
+#graph.focus .node:not(.hot){opacity:.25}
+#graph .drop{fill:var(--accent);stroke:var(--surface);stroke-width:1.5;pointer-events:none}
+#graph .node{cursor:pointer;opacity:0;animation:pop .5s cubic-bezier(.2,1.4,.4,1) forwards;transition:opacity .2s}
+#graph .bob{animation:none}
+#graph .glow{fill:none;stroke:#bfe3ff;stroke-width:3;stroke-linecap:round;stroke-dasharray:.16 1.3;stroke-dashoffset:1.16;opacity:0;pointer-events:none;filter:drop-shadow(0 0 2px rgba(120,180,255,.45))}
+#graph .glow.once{animation:sweep 1.8s cubic-bezier(.65,0,.35,1) both}
+#graph .glow.loop{animation:sweep 1.6s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes sweep{0%{stroke-dashoffset:1.16;opacity:0}15%{opacity:.6}85%{opacity:.6}100%{stroke-dashoffset:0;opacity:0}}
+#graph .dot{transition:r .2s}
+#graph .card rect.bg{fill:var(--surface);stroke-width:2;transition:stroke-width .2s}
+#graph .card rect.ph{fill:var(--border)}
+#graph .card image{opacity:0;transition:filter .35s,opacity .35s}
+#graph .card.ready image{filter:blur(5px) grayscale(.5);opacity:.45}
+#graph .node.hot .card.ready image{filter:none;opacity:1}
+#graph .card rect.bg{transition:stroke-opacity .35s}
+#graph .node:not(.hot) .card rect.bg{stroke-opacity:.35}
+#graph .card{transform-box:view-box;transition:transform .25s cubic-bezier(.2,1.2,.4,1)}
+#graph .node.cur .card{transform:scale(1.8)}
+#graph .stem{stroke-width:1.2;stroke-dasharray:2 2}
+#graph .rk{font:600 10px var(--sans,system-ui);fill:var(--muted);text-anchor:middle;pointer-events:none}
+#graph .node.hot .rk{fill:var(--text)}
+#graph .card rect.bg{stroke-opacity:.55}
+#graph .node.hot .card rect.bg{stroke-width:1.2;stroke-opacity:.6}
+#graph .dot{fill-opacity:.85}
+#graph .sl{font:700 11px var(--sans,system-ui);fill:var(--text);text-anchor:middle;pointer-events:none}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes flow{from{stroke-dashoffset:.065}to{stroke-dashoffset:0}}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes bob{from{transform:translateY(-2.5px)}to{transform:translateY(2.5px)}}
+@media (prefers-reduced-motion:reduce){#graph .edge,#graph .node,#graph .bob{animation:none;stroke-dashoffset:0;opacity:1}#graph .drop,#graph .glow{display:none}}
+#graph text{font:10px var(--mono);fill:var(--muted)}
+.gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:4px;max-width:280px;opacity:0;transition:opacity .12s}
+
+/* clusters */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.cl .card-h{justify-content:space-between;color:var(--text);font-weight:500}
+.cl ol{list-style:none;margin:0;padding:0}
+.cl li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.cl li:last-child{border-bottom:0}
+.cl.rej{opacity:.45}
+.tl{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;align-items:end;height:110px;padding:12px 12px 0}
+.tl div{display:flex;flex-direction:column-reverse;gap:2px}
+.tl span{height:12px;border-radius:2px;background:var(--accent)}
+.tl span.sd{background:var(--text)}
+.tlx{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;padding:4px 12px 10px;text-align:center;font:10.5px var(--mono);color:var(--faint)}
+
+/* eval */
+.evgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media(max-width:1000px){.evgrid{grid-template-columns:minmax(0,1fr)}}
+.bars{padding:12px}
+.brow{display:grid;grid-template-columns:80px minmax(0,1fr) 48px;gap:10px;align-items:center;margin-bottom:8px;font-size:12px}
+.brow .tr{height:16px;background:var(--sunken);border-radius:2px;overflow:hidden}
+.brow .fill{height:100%;background:var(--border-strong);transition:width .4s}
+.brow.hyb .fill{background:var(--accent)}
+.brow.hyb b{color:var(--accent)}
+.brow b{text-align:right;font-family:var(--mono);font-weight:500}
+.note{border-top:1px solid var(--border);padding:10px 12px;font-size:12px;color:var(--muted)}
+.loo td,.loo th{text-align:right;font-family:var(--mono);font-size:12px}
+.loo td:first-child,.loo th:first-child{text-align:left;font-family:var(--sans)}
+.loo td.hit{color:var(--ok)}.loo td.miss{color:var(--faint)}
+
+/* export */
+.exgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px}
+@media(max-width:900px){.exgrid{grid-template-columns:minmax(0,1fr)}}
+.exgrid ol{margin:0;padding:10px 12px 10px 32px;font-size:12.5px}
+.exgrid li{padding:3px 0}
+.exgrid pre{margin:0;padding:12px;font:11.5px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:460px;overflow:auto}
+.empty{padding:14px 12px;color:var(--muted)}
+
+#subq .badge,#concepts .badge{display:inline-block;height:auto;line-height:1.35;padding-top:2px;padding-bottom:2px;margin:0 4px 4px 0;white-space:normal;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.sup{margin:4px 0 0;padding-left:18px;font-size:12px}.sup li{margin:2px 0}.sup a{color:var(--accent)}
+footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);color:var(--faint);font:11px var(--mono)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* chat (from MedicUp chat UI) */
+.chatwrap{display:flex;flex-direction:column;height:calc(100vh - 330px);min-height:460px}
+.chat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.chat-head .grow{flex:1}
+.thread{flex:1;overflow-y:auto;padding:6px 2px 18px}
+.chat-empty{max-width:560px;margin:40px auto;text-align:center;color:var(--muted)}
+.chat-empty h3{color:var(--text);font-weight:600;font-size:20px;margin:0 0 6px}
+.sugg{display:flex;flex-direction:column;gap:6px;margin-top:18px;text-align:left}
+.sugg button{all:unset;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:13.5px}
+.sugg button:hover{border-color:var(--accent)}
+.umsg{display:flex;justify-content:flex-end;margin:14px 0}
+.ububble{background:var(--sunken);border:1px solid var(--border);padding:9px 14px;border-radius:16px 16px 4px 16px;max-width:78%;white-space:pre-wrap}
+.amsg{display:flex;gap:10px;margin:14px 0}
+.amsg .av{flex:none;width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid var(--border);display:grid;place-items:center}
+.amsg .av img{width:18px}
+.abody{flex:1;min-width:0}
+.aname{font-size:12.5px;font-weight:600;margin-bottom:4px}.aname small{font-weight:400;color:var(--faint);margin-left:6px}
+.prose{font-size:14.5px;line-height:1.65}.prose p{margin:.5em 0}.prose ul,.prose ol{padding-left:1.3em}.prose h2,.prose h3,.prose h4{font-size:15px;margin:1em 0 .3em}
+.prose table{border-collapse:collapse;font-size:13px}.prose td,.prose th{border:1px solid var(--border);padding:4px 8px}
+sup.cite{cursor:pointer;color:var(--accent);font-weight:600;font-size:10.5px;padding:0 2px}
+.srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.srcs a,.srcs button{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;max-width:340px;font-size:12px;border:1px solid var(--border);border-radius:999px;padding:3px 10px 3px 4px;background:var(--surface);color:var(--text)}
+.srcs .n{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:50%;background:var(--sunken);font:600 10.5px var(--mono,ui-monospace)}
+.srcs span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thinking{color:var(--muted);font-size:13.5px}.thinking i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.composer{border:1px solid var(--border-strong);border-radius:18px;background:var(--surface);padding:8px 8px 8px 14px;display:flex;align-items:flex-end;gap:8px}
+.composer textarea{flex:1;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;font-size:14.5px;max-height:160px;padding:6px 0}
+.composer .send{flex:none;width:34px;height:34px;border-radius:50%;border:0;background:var(--text);color:var(--surface);cursor:pointer;display:grid;place-items:center}
+.composer .send:disabled{opacity:.35;cursor:default}
+.chat-note{font-size:12px;color:var(--faint);margin-top:6px;text-align:center}
+.chat-warn{border:1px solid var(--border);background:var(--sunken);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--muted);margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="/" title="MedicUp home" style="display:flex;align-items:center"><img src="/static/brand/medicup-logo.png" alt="MedicUp" style="height:26px;width:auto;display:block;background:#fff;border-radius:6px;padding:3px 6px"></a>
+    <span class="runid mono faint" id="runid">not run yet</span>
+    <nav class="stages" id="stages" aria-label="Pipeline stages"></nav>
+    <button class="iconbtn" id="theme" type="button" aria-label="Toggle theme"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+</header>
+
+<section class="query">
+  <div class="qf">
+    <label for="qInput">Research question</label>
+    <input id="qInput" type="text" value="What mechanisms make CAR-T therapy fail in solid tumors?" autocomplete="off">
+    <div class="hint">Used for keyword sub-queries and by the LLM judge.</div>
+  </div>
+  <div class="qf">
+    <label for="seedInput">Seeds <span class="faint">· papers you already trust · one per line</span></label>
+    <textarea id="seedInput" rows="6" spellcheck="false" placeholder="10.1016/j.ymthe.2019.03.012&#10;PMID: 31234567&#10;CAR-T persistence in mesothelin-positive tumors"></textarea>
+    <div class="hint" id="seedHint"></div>
+  </div>
+  <div class="qact">
+    <button class="btn" id="runBtn" type="button">Run discovery <kbd>⌘↵</kbd></button>
+    <div class="hint" id="runHint"></div>
+  </div>
+  <div class="demo" id="status" style="color:var(--muted)">Live data: seeds resolve against OpenAlex; discovery uses the citation graph, OpenAlex keyword search and Tavily. Press Run discovery.</div>
+</section>
+
+<div class="layout">
+  <aside class="side">
+    <section class="sec">
+      <h3>Seeds <span id="seedCount"></span></h3>
+      <div class="alert" id="seedNotice" hidden></div>
+      <div id="seeds"></div>
+    </section>
+    <section class="sec">
+      <h3>Seed profile <span>openalex · tavily</span></h3>
+      <dl class="kv">
+        <dt>Years</dt><dd><span class="num" id="yrs">—</span></dd>
+        <dt></dt><dd style="display:block"><div class="hist" id="hist"></div></dd>
+        <dt>Concepts</dt><dd id="concepts"><span class="faint">after run</span></dd>
+        <dt>Sub-queries</dt><dd id="subq"><span class="faint">after run</span></dd>
+      </dl>
+    </section>
+    <section class="sec">
+      <h3>Score weights <span>re-ranks from cache</span></h3>
+      <label class="wt"><span><i style="background:var(--g)"></i>Graph</span><input type="range" id="wG" min="0" max="100" value="40"><span class="num" id="wGv"></span></label>
+      <label class="wt"><span><i style="background:var(--s)"></i>Semantic</span><input type="range" id="wS" min="0" max="100" value="35"><span class="num" id="wSv"></span></label>
+      <label class="wt"><span><i style="background:var(--l)"></i>LLM judge</span><input type="range" id="wL" min="0" max="100" value="25"><span class="num" id="wLv"></span></label>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="ranked">Ranked <span class="count" id="nRanked"></span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="graph">Citation graph</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="clusters">Clusters <span class="count" id="nCl">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="eval">Evaluation</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="export">Reading list <span class="count" id="nAcc">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="chat">Ask MedicUp</button>
+    </div>
+
+    <div class="panel" id="p-ranked">
+      <div class="toolbar" id="filters">
+        <button class="chk" data-f="peer" aria-pressed="false">Peer-reviewed</button>
+        <button class="chk" data-f="recent" aria-pressed="false">≥ 2022</button>
+        <button class="chk" data-f="oa" aria-pressed="false">Open access</button>
+        <span class="sep"></span>
+        <span class="faint" style="font-size:12px">source:</span>
+        <button class="chk" data-c="graph" aria-pressed="false">graph</button>
+        <button class="chk" data-c="semantic" aria-pressed="false">semantic</button>
+        <button class="chk" data-c="keyword" aria-pressed="false">keyword</button>
+        <button class="chk" data-c="web" aria-pressed="false">web</button>
+        <span class="right mono faint" id="shown"></span>
+      </div>
+      <div class="card" id="webctx" hidden style="margin-bottom:10px"></div>
+      <div class="diff" id="diff" role="status"><span class="mono" style="color:var(--accent)">re-ranked</span><span id="diffText"></span><button id="undo" type="button">Undo</button></div>
+      <div class="tw"><table class="res"><thead><tr>
+        <th style="width:32px"></th><th style="width:44px">#</th><th style="width:44px">Δ</th><th>Paper</th><th style="width:60px">Year</th><th style="width:110px">Type</th><th style="width:150px">Found via</th><th style="width:130px">Score</th><th style="width:140px">Decision</th>
+      </tr></thead><tbody id="rows"></tbody></table></div>
+    </div>
+
+    <div class="panel" id="p-graph" hidden>
+      <div class="card">
+        <div class="card-h"><span><i style="background:var(--text)"></i><b>Seed N</b> = a paper you provided (middle row)</span><span><i style="background:var(--accent)"></i><b>Rank N</b> = position in the ranked list</span><span><i style="background:var(--err)"></i>flagged</span><span>dot size = score · branches = citation links · hover a dot to bring its chain and figures into focus</span><button class="iconbtn" id="replay" type="button" style="margin-left:auto">Replay</button></div>
+        <svg id="graph" viewBox="0 0 1000 900" role="img" aria-label="Citation graph of seeds and candidates"></svg>
+        <div class="gtip" id="gtip"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-clusters" hidden>
+      <div class="cgrid" id="clusters"></div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-h"><span style="color:var(--text);font-weight:500">Publication years</span><span><i style="background:var(--text);border-radius:2px"></i>seeds</span><span><i style="background:var(--accent);border-radius:2px"></i>candidates</span></div>
+        <div class="tl" id="tl"></div><div class="tlx" id="tlx"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-eval" hidden>
+      <div class="evgrid">
+        <div class="card">
+          <div class="card-h" style="justify-content:space-between"><span style="color:var(--text);font-weight:500">Leave-one-out recall · <span id="looInfo">not run</span></span>
+            <div class="seg" id="kpick"><button data-k="5">@5</button><button data-k="10" class="on a">@10</button><button data-k="20">@20</button></div></div>
+          <div class="bars" id="bars"></div>
+          <div class="note">Method: hide one seed, rank the candidate pool using only the remaining seeds, and record where the hidden seed lands (— = channel never found it). Every channel is scored separately, so keyword search is a real baseline. At this k, hybrid recovers <b class="num" id="mult" style="color:var(--accent)"></b> as many seeds as keyword.</div>
+        </div>
+        <div class="card"><div class="card-h"><span style="color:var(--text);font-weight:500">Rank of hidden seed per channel</span><span>— = channel never found it</span></div>
+          <div style="overflow-x:auto"><table class="loo" id="loo"></table></div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-export" hidden>
+      <div class="exgrid">
+        <div class="card"><div class="card-h"><span style="color:var(--text);font-weight:500">Accepted</span><span class="mono" id="expCount"></span></div><div id="expList"></div></div>
+        <div class="card">
+          <div class="card-h" style="justify-content:space-between">
+            <div class="seg" id="fmt"><button data-fmt="md" class="on a">Markdown</button><button data-fmt="bib">BibTeX</button><button data-fmt="ris">RIS</button></div>
+            <button class="iconbtn" id="copyBtn" type="button">Copy</button></div>
+          <pre id="expOut"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="p-chat" hidden>
+      <div class="chatwrap">
+        <div class="chat-head">
+          <div class="seg" id="cmode"><button data-m="papers" class="on a">About these papers</button><button data-m="lit">Whole literature</button></div>
+          <span class="faint" id="cscope" style="font-size:12.5px"></span><span class="grow"></span>
+          <button class="iconbtn" id="cclear" type="button">New chat</button>
+          <a class="iconbtn" href="/chat" title="Full-screen chat with saved conversations">Open full chat ↗</a>
+        </div>
+        <div class="chat-warn" id="cwarn" hidden></div>
+        <div class="thread" id="thread"></div>
+        <div class="composer"><textarea id="cin" rows="1" placeholder="Ask about the ranked papers…"></textarea><button class="send" id="csend" type="button" aria-label="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+        <div class="chat-note" id="cnote">Answers cite only the papers in this run · click a number to open the paper</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<footer><span>Each result links back to the seeds and sources that produced it</span><span>backend: MedicUp (FastAPI) · data: OpenAlex · web: Tavily · LLM: Nebius Token Factory</span></footer>
+
+<script>
+/* Mock lookup index standing in for openalex / crossref / pubmed. */
+const DEFAULT_SEEDS=["10.1038/s41571-019-0297-y","https://doi.org/10.1158/1078-0432.ccr-13-2627","PMID: 27454297","PMID 26979791","CAR T Cell Therapy for Solid Tumors","Augmentation of CAR T-cell Trafficking and Antitumor Efficacy by Blocking Protein Kinase A Localization","10.1158/2326-6066.cir-13-0170","CAR T cells solid tumors review","10.9999/broken.doi.2017"].join("\n");
+/* live state: filled from the MedicUp backend (/api/medicap/*) */
+let SEEDS=[],ENTRIES=[],P=[],CL={},LOO=[],WEBCTX={},JUDGE=false,TAVILY=true,RES=null;
+const RCACHE={};
+async function api(path,body){
+  const r=await fetch(path,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{});
+  if(!r.ok)throw new Error(`${r.status} ${(await r.text()).slice(0,160)}`);
+  return r.json();
+}
+function status(msg,kind){const el=$("#status");el.textContent=msg;el.style.color=kind==="err"?"var(--err)":kind==="ok"?"var(--ok)":"var(--muted)"}
+const safeUrl=u=>/^https?:\/\//i.test(String(u||""))?esc(u):"";
+const CH_TAG={graph:"g",semantic:"s",keyword:"",web:""};
+const st={dec:{},open:new Set(),f:new Set(),c:new Set(),w:{g:40,s:35,l:25},prevW:null,prevOrder:null,k:10,fmt:"md",tab:"ranked"};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const useL=p=>JUDGE&&p.l!=null;
+function score(p,w=st.w){const l=useL(p),t=w.g+w.s+(l?w.l:0)||1;return (w.g*p.g+w.s*p.s+(l?w.l*p.l:0))/t}
+function topScore(w=st.w){return Math.max(1e-9,...P.map(p=>score(p,w)))}
+const rel=(p,w=st.w)=>score(p,w)/topScore(w);  /* shown score: best candidate in the run = 100 % */
+function pct(v){return Math.max(1,Math.min(100,Math.round(v*100)))+"%"}
+function ranked(w){return [...P].sort((a,b)=>score(b,w)-score(a,w)).map(p=>p.id)}
+let base=ranked();
+
+/* stages */
+const STAGES=[["resolve","",""],["expand","",""],["semantic","","tf-idf"],["judge","",""],["web","","tavily"],["rank","",""]];
+function renderStages(){$("#stages").innerHTML=STAGES.map(([n,s,m])=>`<span class="stg ${s}"><i></i>${n}${m?` <span class="faint">${m}</span>`:""}</span>`).join("")}
+
+/* seeds: parse + resolve each line of the seeds box */
+const STOP=new Set("a an and the of in on for to with after from by at is".split(" "));
+const toks=s=>s.toLowerCase().split(/[^a-z0-9]+/).filter(w=>w&&!STOP.has(w));
+const norm=s=>toks(s).join(" ");
+function dice(a,b){const A=new Set(toks(a)),B=new Set(toks(b));let n=0;A.forEach(w=>B.has(w)&&n++);return A.size+B.size?2*n/(A.size+B.size):0}
+const RX_DOI=/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)$/i,RX_PMID=/^(?:pmid:?\s*)?(\d{6,9})$/i;
+let seedSeq=0;
+async function parseSeeds(){
+  const seq=++seedSeq,lines=$("#seedInput").value.split("\n").map((l,i)=>[i,l.trim()]).filter(x=>x[1]);
+  const need=[...new Set(lines.map(x=>x[1]).filter(r=>!RCACHE[r]))];
+  if(need.length){
+    $("#seedCount").textContent="resolving…";
+    try{const r=await api("/api/medicap/resolve",{lines:need});need.forEach((raw,i)=>RCACHE[raw]=r.results[i])}
+    catch(err){status("Seed lookup failed: "+err.message,"err")}
+    if(seq!==seedSeq)return;
+  }
+  const seen={};ENTRIES=[];
+  lines.forEach(([i,raw])=>{
+    const r={line:i,raw,...(RCACHE[raw]||{kind:"title",st:"miss",msg:"lookup failed, edit the line to retry"})};
+    if(r.st==="ok"){if(seen[r.p.id]!==undefined){r.st="dup";r.dupOf=seen[r.p.id]}else seen[r.p.id]=i}
+    ENTRIES.push(r)});
+  SEEDS=ENTRIES.filter(e=>e.st==="ok").map((e,k)=>({id:k+1,wid:e.p.id,t:e.p.t,m:`${e.p.y} · ${e.p.v}`,y:e.p.y,ok:1}));
+  renderSeeds();
+}
+function renderSeeds(){
+  const n=ENTRIES.length,ok=SEEDS.length,c=k=>ENTRIES.filter(e=>e.st===k).length,amb=c("amb"),miss=c("miss"),dup=c("dup");
+  const kinds=["doi","pmid","openalex","title"].map(k=>[k,ENTRIES.filter(e=>e.kind===k).length]).filter(x=>x[1]);
+  $("#seedHint").innerHTML=n?`<span>${n} line${n===1?"":"s"}</span>${kinds.map(([k,v])=>`<span>${v} ${k==="pmid"?"PMID":k==="doi"?"DOI":k==="openalex"?"OpenAlex ID":"title"}</span>`).join("")}`:"<span>DOI, doi.org link, PMID or exact title</span>";
+  $("#seedCount").textContent=`${ok}/${n} resolved`;
+  const issues=[miss&&`${miss} not found`,amb&&`${amb} need${amb===1?"s":""} a choice`,dup&&`${dup} duplicate${dup===1?"":"s"}`].filter(Boolean);
+  $("#seedNotice").hidden=!issues.length;
+  $("#seedNotice").innerHTML=`<b>${issues.join(", ")}.</b> Unresolved lines are skipped when you run.`;
+  $("#seeds").innerHTML=ENTRIES.map(e=>{
+    const L=`<span class="mono faint">L${e.line+1}</span>`;
+    if(e.st==="ok"){const n=SEEDS.find(s=>s.wid===e.p.id).id;return `<div class="seedrow" data-seed="${n}"><span class="mono faint">S${n}</span><div><b>${esc(e.p.t)}</b><small>${e.p.y??"—"} · ${esc(e.p.v)} · via ${e.kind}${e.fuzzy?` <span class="badge warn">fuzzy ${pct(e.fuzzy)}</span>`:""}</small></div><span class="badge ok">ok</span></div>`}
+    if(e.st==="amb")return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>${e.cands.length} close matches. Pick one:</small><div class="acts">${e.cands.map(x=>`<button class="pick" data-line="${e.line}" data-doi="${esc(x.p.doi||x.p.id)}">${esc(x.p.t)} <span class="faint">${x.p.y??"—"} · ${pct(x.s)}</span></button>`).join("")}<button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge warn">ambiguous</span></div>`;
+    if(e.st==="dup")return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>Same paper as line ${e.dupOf+1}</small><div class="acts"><button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge">duplicate</span></div>`;
+    return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>${esc(e.msg)}</small><div class="acts"><button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge err">not found</span></div>`;
+  }).join("")||'<div class="empty" style="padding:4px 0">No seeds yet. Add at least 3 papers you trust.</div>';
+  const sy=SEEDS.map(s=>s.y).filter(Boolean),y1=Math.max(...sy,new Date().getFullYear()-1),y0=Math.max(Math.min(...sy,y1-10),y1-14),yrs=[];for(let y=y0;y<=y1;y++)yrs.push(y);
+  $("#yrs").textContent=sy.length?`${Math.min(...sy)}–${Math.max(...sy)}`:"—";
+  $("#hist").innerHTML=yrs.map(y=>{const k=SEEDS.filter(s=>s.y===y).length;return `<span title="${y}: ${k}" style="height:${k?40+k*60:8}%;${k?"background:var(--accent)":""}"></span>`}).join("");
+  STAGES[0]=["resolve",!n?"":ok===n?"ok":"warn",`${ok}/${n}`];renderStages();
+  $("#runBtn").disabled=!ok;
+  $("#runHint").textContent=!ok?"Add at least one resolvable seed":ok<3?"Fewer than 3 seeds gives weak results":"";
+}
+function editLine(i,txt){const ls=$("#seedInput").value.split("\n");txt===null?ls.splice(i,1):ls[i]=txt;$("#seedInput").value=ls.join("\n");parseSeeds();renderAll()}
+$("#seeds").addEventListener("click",e=>{
+  const p=e.target.closest(".pick");if(p)return editLine(+p.dataset.line,p.dataset.doi);
+  const r=e.target.closest("[data-rm]");if(r)editLine(+r.dataset.rm,null);
+});
+let seedTimer;
+$("#seedInput").addEventListener("input",()=>{clearTimeout(seedTimer);seedTimer=setTimeout(()=>{parseSeeds();renderAll()},250)});
+$("#seedInput").value=DEFAULT_SEEDS;
+
+/* weights */
+function syncW(){const t=st.w.g+st.w.s+(JUDGE?st.w.l:0)||1;["g","s","l"].forEach(k=>{$("#w"+k.toUpperCase()+"v").textContent=k==="l"&&!JUDGE?"off":pct(st.w[k]/t)});$("#wL").disabled=!JUDGE;$("#wL").title=JUDGE?"":"LLM judge needs NEBIUS_API_KEY on the server"}
+let wTimer;
+["g","s","l"].forEach(k=>$("#w"+k.toUpperCase()).addEventListener("input",e=>{
+  if(!st.prevW){st.prevW={...st.w};st.prevOrder=ranked(st.w)}
+  st.w[k]=+e.target.value;syncW();renderRows();
+  clearTimeout(wTimer);wTimer=setTimeout(showDiff,250);
+}));
+function showDiff(){
+  const now=ranked(st.w),before=st.prevOrder;let moved=0,big=null;
+  now.forEach((id,i)=>{const d=before.indexOf(id)-i;if(d)moved++;if(!big||Math.abs(d)>Math.abs(big.d))big={id,d}});
+  if(!moved){$("#diff").classList.remove("show");return}
+  const p=P.find(x=>x.id===big.id);
+  $("#diffText").innerHTML=`${moved} rows moved. Largest: <b>${esc(p.t.slice(0,60))}…</b> <span class="num ${big.d>0?"delta up":"delta down"}">${big.d>0?"▲":"▼"}${Math.abs(big.d)}</span>`;
+  $("#diff").classList.add("show");
+}
+$("#undo").onclick=()=>{if(!st.prevW)return;st.w={...st.prevW};["g","s","l"].forEach(k=>$("#w"+k.toUpperCase()).value=st.w[k]);st.prevW=null;syncW();renderRows();$("#diff").classList.remove("show")};
+
+/* ranked table */
+const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>';
+function visible(){
+  return ranked(st.w).map(id=>P.find(p=>p.id===id)).filter(p=>
+    (!st.f.has("peer")||p.peer)&&(!st.f.has("recent")||p.y>=new Date().getFullYear()-3)&&(!st.f.has("oa")||p.oa)&&
+    (!st.c.size||p.ch.some(c=>st.c.has(c))));
+}
+function why(p){
+  const S=n=>`<span class="sref" data-s="${n}">S${n}</span>`,L=p.links||{},out=[];
+  if(L.cites&&L.cites.length)out.push(`Cites ${L.cites.map(S).join(", ")}.`);
+  if(L.cited_by&&L.cited_by.length)out.push(`Cited by ${L.cited_by.map(S).join(", ")}.`);
+  const sh=Object.entries(L.shared||{}).filter(([,n])=>n>=3);
+  if(sh.length)out.push(`Shares references with ${sh.map(([s,n])=>`${S(s)} (${n})`).join(", ")}.`);
+  if(p.kw_rank)out.push(`OpenAlex keyword search rank #${p.kw_rank}.`);
+  if(p.web_hit)out.push(`Tavily scholarly web search rank #${p.web_rank}.`);
+  if(p.flag)out.push(`<b>Flagged ${esc(p.flag)} by OpenAlex.</b>`);
+  const first=(p.abstract||"").split(/(?<=[.!?])\s/)[0];
+  if(first)out.push(`<q>${esc(first.slice(0,280))}</q>`);
+  return out.join(" ")||"Matched by the ranking channels.";
+}
+function trace(p){
+  const T=topScore(),t=st.w.g+st.w.s+(useL(p)?st.w.l:0)||1,L=p.links||{};
+  const out=[];
+  out.push(`<span class="tc"># provenance for ${esc(p.id)}</span>`);
+  if(p.doi)out.push(`<span class="tk">doi</span>: <span class="ts">"${esc(p.doi)}"</span>`);
+  out.push(`<span class="tk">source</span>: <span class="ts">${p.id.startsWith("web:")?"tavily":"openalex "+esc(p.id)}</span>  <span class="tc"># cited_by=${p.cit}</span>`);
+  out.push(`<span class="tk">channels</span>:`);
+  p.ch.forEach(c=>{
+    if(c==="graph")out.push(`  - graph: cites [${(L.cites||[]).map(s=>"S"+s).join(", ")}] · cited by [${(L.cited_by||[]).map(s=>"S"+s).join(", ")}] · shared refs ${esc(JSON.stringify(L.shared||{}))}`);
+    if(c==="semantic")out.push(`  - semantic: <span class="tn">${pct(p.s)}</span> of best tf-idf cosine vs question + seeds`);
+    if(c==="keyword")out.push(`  - keyword: openalex search, rank #${p.kw_rank}`);
+    if(c==="web")out.push(`  - web: tavily scholarly search, rank #${p.web_rank}`);
+  });
+  (p.web||[]).forEach(w=>out.push(`      ↳ <span class="ts">"${esc(w.title)}"</span> <span class="tc">${esc(w.domain)} · ${w.score_pct}%</span>`));
+  out.push(`<span class="tk">judge</span>: ${useL(p)?`<span class="tn">${pct(p.l)}</span>  <span class="tc"># llm relevance, abstract + seed titles</span>`:`off  <span class="tc"># ${JUDGE?"not judged":"no NEBIUS_API_KEY on server"}</span>`}`);
+  if(p.flag)out.push(`<span class="tk">flags</span>: [<span class="ts">"${esc(p.flag)}"</span>]  <span class="tc"># openalex is_retracted</span>`);
+  out.push(`<span class="tk">score</span>: <span class="tn">${pct(score(p)/T)}</span> of best = ${pct(st.w.g/t)}·g + ${pct(st.w.s/t)}·s${useL(p)?` + ${pct(st.w.l/t)}·l`:""}`);
+  return out.join("\n");
+}
+function renderRows(){
+  const rows=visible(),order=ranked(st.w);
+  $("#nRanked").textContent=P.length;$("#nCl").textContent=Object.keys(CL).length;
+  $("#shown").textContent=`${rows.length} of ${P.length}`;
+  const T=topScore();
+  $("#rows").innerHTML=rows.map(p=>{
+    const t=st.w.g+st.w.s+(useL(p)?st.w.l:0)||1,lw=useL(p)?st.w.l:0;
+    const r=order.indexOf(p.id)+1,d=base.indexOf(p.id)+1-r,dec=st.dec[p.id],open=st.open.has(p.id),sc=score(p)/T;
+    const cls=["row",dec==="a"?"acc":"",dec==="r"?"rej":"",p.flag?"flag":""].join(" ");
+    const bar=`<div class="sbar"><span style="width:${st.w.g/t*p.g/T*100}%;background:var(--g)"></span><span style="width:${st.w.s/t*p.s/T*100}%;background:var(--s)"></span><span style="width:${lw/t*(p.l||0)/T*100}%;background:var(--l)"></span></div>`;
+    let h=`<tr class="${cls}" data-id="${p.id}">
+      <td><button class="chev" aria-expanded="${open}" aria-label="Show details" data-x="${p.id}">${ICON}</button></td>
+      <td class="num">${r}</td>
+      <td class="num">${d?`<span class="delta ${d>0?"up":"down"}">${d>0?"▲":"▼"}${Math.abs(d)}</span>`:'<span class="faint">·</span>'}</td>
+      <td><div class="t">${esc(p.t)}</div><div class="au">${esc(p.au||"")}${p.v?" · "+esc(p.v):""} · <span class="num">${p.cit}</span> cites${p.oa?' · <span class="badge ok">OA</span>':""}${p.flag?` <span class="badge err">${esc(p.flag)}</span>`:""}${!p.peer?' <span class="badge warn">preprint</span>':""}</div></td>
+      <td class="num">${p.y??"—"}</td>
+      <td><span class="badge">${esc(p.type)}</span></td>
+      <td>${p.ch.map(c=>`<span class="badge ${CH_TAG[c]}">${c}</span>`).join(" ")}</td>
+      <td><span class="num">${pct(sc)}</span>${bar}</td>
+      <td><div class="seg"><button class="${dec==="a"?"on a":""}" data-d="a" data-id="${p.id}">Accept</button><button class="${dec==="r"?"on r":""}" data-d="r" data-id="${p.id}">Reject</button></div></td>
+    </tr>`;
+    if(open)h+=`<tr class="detail"><td colspan="9"><div class="det">
+      <div><h4>Why it's here</h4><p>${why(p)}</p>
+        ${safeUrl(p.url)?`<p><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">Open paper ↗</a></p>`:""}
+        ${(p.web||[]).filter(w=>safeUrl(w.url)).length?`<h4>Supporting sources (Tavily)</h4><ul class="sup">${p.web.filter(w=>safeUrl(w.url)).map(w=>`<li><a href="${safeUrl(w.url)}" target="_blank" rel="noopener">${esc(w.title)}</a> <span class="faint">${esc(w.domain)} · ${w.score_pct}%</span></li>`).join("")}</ul>`:""}
+        <h4>Score components</h4>
+        <table class="comp"><thead><tr><th>Channel</th><th>Raw</th><th>Weight</th><th>Contribution</th></tr></thead><tbody>
+          ${[["graph","g"],["semantic","s"],["llm judge","l"]].map(([n,k])=>k==="l"&&!useL(p)?`<tr><td><span class="badge l">${n}</span></td><td class="num faint">off</td><td class="num faint">—</td><td class="num faint">—</td></tr>`:`<tr><td><span class="badge ${k}">${n}</span></td><td class="num">${pct(p[k])}</td><td class="num">${pct(st.w[k]/t)}</td><td class="num">${(st.w[k]/t*p[k]*100).toFixed(1)}%</td></tr>`).join("")}
+          <tr><td><b>total</b></td><td></td><td></td><td class="num"><b>${(score(p)*100).toFixed(1)}%</b></td></tr>
+          <tr><td colspan="3" class="faint">shown score (best in run = 100%)</td><td class="num"><b>${pct(sc)}</b></td></tr>
+        </tbody></table></div>
+      <div><h4>Trace</h4><pre class="trace">${trace(p)}</pre></div>
+    </div></td></tr>`;
+    return h;
+  }).join("")||`<tr><td colspan="9" class="empty">${P.length?"No rows match these filters.":"Run discovery to rank candidates from your seeds."}</td></tr>`;
+}
+$("#rows").addEventListener("click",e=>{
+  const x=e.target.closest("[data-x]");if(x){const id=x.dataset.x;st.open.has(id)?st.open.delete(id):st.open.add(id);renderRows();return}
+  const d=e.target.closest("[data-d]");if(d){const id=d.dataset.id,p=P.find(x=>x.id===id);
+    if(d.dataset.d==="a"&&st.dec[id]!=="a"&&p&&p.flag&&!confirm(`This paper is flagged as ${p.flag}. Add it to the reading list anyway?`))return;
+    st.dec[id]=st.dec[id]===d.dataset.d?undefined:d.dataset.d;renderAll()}
+});
+$("#rows").addEventListener("mouseover",e=>{
+  const s=e.target.closest(".sref");$$(".seedrow").forEach(r=>r.classList.toggle("hl",!!s&&r.dataset.seed===s.dataset.s));
+});
+$("#filters").addEventListener("click",e=>{
+  const b=e.target.closest(".chk");if(!b)return;
+  const set=b.dataset.f?st.f:st.c,key=b.dataset.f||b.dataset.c;
+  set.has(key)?set.delete(key):set.add(key);b.setAttribute("aria-pressed",set.has(key));renderRows();
+});
+
+/* tabs */
+$$(".tab").forEach(t=>t.onclick=()=>{
+  $$(".tab").forEach(x=>x.setAttribute("aria-selected",x===t));
+  $$(".panel").forEach(p=>p.hidden=p.id!=="p-"+t.dataset.tab);
+  st.tab=t.dataset.tab;if(st.tab==="graph")renderGraph();
+});
+
+/* graph: seeds in a middle row, ranked papers branch above/below on curved links; each point carries a figure card */
+const FIG={},FIGREQ=new Set(),GMAX=30;
+const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296};
+async function loadFigures(){
+  const seedMeta=w=>(ENTRIES.find(e=>e.p&&e.p.id===w)||{p:{}}).p;
+  const want=[...SEEDS.map(s=>({id:s.wid,t:s.t,doi:seedMeta(s.wid).doi||"",pmid:seedMeta(s.wid).pmid||""})),
+    ...ranked(st.w).slice(0,GMAX).map(id=>P.find(p=>p.id===id)).map(p=>({id:p.id,t:p.t,doi:p.doi,pmid:p.pmid}))]
+    .filter(p=>!(p.id in FIG)&&!FIGREQ.has(p.id));
+  if(!want.length)return;
+  want.forEach(p=>FIGREQ.add(p.id));
+  const batches=[];for(let i=0;i<want.length;i+=4)batches.push(want.slice(i,i+4));
+  await Promise.all(batches.map(async b=>{
+    try{const r=await api("/api/medicap/figures",{papers:b});Object.assign(FIG,r.figures);if(st.tab==="graph")paintFigures()}
+    catch(err){b.forEach(p=>FIGREQ.delete(p.id))}
+  }));
+}
+function paintFigures(){
+  $$("#graph .node").forEach(g=>{
+    const f=FIG[g.dataset.fid],card=g.querySelector(".card");
+    if(!f||!f.url||!card||card.dataset.done)return;
+    card.dataset.done=1;
+    const img=card.querySelector("image");
+    img.addEventListener("load",()=>{card.style.display="";card.classList.add("ready")},{once:true});
+    img.addEventListener("error",()=>card.remove(),{once:true});
+    img.setAttribute("href","/api/medicap/img?u="+encodeURIComponent(f.url));
+  });
+}
+function renderGraph(animate=true){
+  const W=1000,H=900,mid=H/2,svg=$("#graph");
+  const seeds=SEEDS.filter(s=>s.ok),pos={};
+  const sx=i=>seeds.length===1?W/2:110+i*(W-220)/(seeds.length-1);
+  seeds.forEach((s,i)=>pos["S"+s.id]=[sx(i),mid+(i%2?16:-16)]);
+  const order=ranked(st.w),shown=order.slice(0,GMAX).map(id=>P.find(p=>p.id===id)).filter(Boolean);
+  /* main branch = the seed this paper is most tied to: direct citation first, then most shared references */
+  const tie=(p,n)=>{const L=p.links||{};return ((L.cites||[]).includes(n)||(L.cited_by||[]).includes(n)?5:0)+(+((L.shared||{})[n]||0))+hash(p.id+n)*.5};
+  const primary=p=>{const c=(p.sl||[]).filter(n=>pos["S"+n]);return c.length?c.reduce((a,b)=>tie(p,a)>=tie(p,b)?a:b):null};
+  const halves=[[],[]];shown.forEach((p,i)=>halves[i%2].push(p));
+  halves.forEach((hs,side)=>{
+    hs.sort((a,b)=>{const pa=primary(a),pb=primary(b);return (pa?pos["S"+pa][0]:W/2)-(pb?pos["S"+pb][0]:W/2)||hash(a.id)-hash(b.id)});
+    hs.forEach((p,i)=>{
+      const x=50+(i+.5)*(W-100)/hs.length+(hash(p.id+"x")-.5)*10;
+      const dy=125+(i%3)*88+(hash(p.id+"y")-.5)*18;
+      pos[p.id]=[x,side?mid+dy:mid-dy];
+    });
+  });
+  const curve=([x1,y1],[x2,y2])=>{const my=(y1+y2)/2,bend=(hash(x2+":"+y2)-.5)*70;return `M${x1},${y1} C${x1+bend},${my} ${x2-bend},${my} ${x2},${y2}`};
+  const an=(d)=>animate?`animation-delay:${d}s`:"animation-duration:0s";
+  let h=`<g class="edges">`;
+  shown.forEach((p,i)=>{const pr=primary(p);(p.sl||[]).forEach(n=>{if(!pos["S"+n])return;
+    h+=`<path class="edge${n===pr?" main":""}" pathLength="1" d="${curve(pos["S"+n],pos[p.id])}" data-e="${esc(p.id)}" data-es="${n}" style="${an((.15+i*.035).toFixed(2))}"/>`})});
+  h+=`</g><g class="glows">${animate?shown.map((p,i)=>{const pr=primary(p);return pr&&pos["S"+pr]?`<path class="glow once" pathLength="1" d="${curve(pos["S"+pr],pos[p.id])}" style="animation-delay:${(.25+i*.05).toFixed(2)}s"/>`:""}).join(""):""}</g><g class="drops"></g>`;
+  /* a node = small dot + (hidden until its image loads) figure card on a short stem, above or below the dot */
+  const node=(k,fid,x,y,r,col,label,up,big,delay,data)=>{
+    const cw=big?96:72,ch=big?68:52,gap=r+10,cy=up?y-gap-ch:y+gap,cx=x-cw/2,ly=up?y+r+12:y-r-5;
+    return `<g class="node" ${data} data-fid="${esc(fid)}" style="${an(delay)}"><g class="bob" style="--bd:${(4+hash(k)*3).toFixed(2)}s">
+      <g class="card" style="display:none;transform-origin:${x}px ${up?cy+ch:cy}px">
+        <line class="stem" x1="${x}" y1="${up?y-r:y+r}" x2="${x}" y2="${up?cy+ch:cy}" stroke="${col}"/>
+        <rect class="bg" x="${cx-3}" y="${cy-3}" width="${cw+6}" height="${ch+6}" rx="7" stroke="${col}"/>
+        <rect class="ph" x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="5"/>
+        <image x="${cx}" y="${cy}" width="${cw}" height="${ch}" preserveAspectRatio="xMidYMid meet" referrerpolicy="no-referrer"/>
+      </g>
+      <circle class="dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>
+      <text class="${k.startsWith("S")?"sl":"rk"}" x="${x}" y="${ly}">${label}</text></g></g>`};
+  seeds.forEach((s,i)=>{const[x,y]=pos["S"+s.id];h+=node("S"+s.id,s.wid,x,y,10,"var(--text)","Seed "+s.id,i%2===0,true,(.05*i).toFixed(2),`data-s="${s.id}"`)});
+  shown.forEach((p,i)=>{const[x,y]=pos[p.id],dec=st.dec[p.id],rk=order.indexOf(p.id)+1;
+    const col=p.flag?"var(--err)":dec==="a"?"var(--ok)":"var(--accent)";
+    h+=node(p.id,p.id,x,y,5+rel(p)*4,col,"Rank "+rk,y<mid,rk<=10,(.35+i*.035).toFixed(2),`data-p="${esc(p.id)}"${dec==="r"?' style="opacity:.3"':""}`)});
+  svg.innerHTML=h;
+  paintFigures();loadFigures();
+}
+$("#replay").onclick=()=>renderGraph(true);
+let hotKey=null;
+function setFocus(c){
+  const svg=$("#graph"),key=c?(c.dataset.p||"S"+c.dataset.s):null;
+  if(key===hotKey)return;hotKey=key;
+  svg.classList.toggle("focus",!!c);
+  const drops=svg.querySelector(".drops");drops.innerHTML="";
+  const hot=$$("#graph .edge").filter(l=>!!c&&(c.dataset.p?l.dataset.e===c.dataset.p:l.dataset.es===c.dataset.s));
+  $$("#graph .edge").forEach(l=>l.classList.toggle("hot",hot.includes(l)));
+  const linked=new Set(hot.flatMap(l=>[l.dataset.e,"S"+l.dataset.es]));
+  $$("#graph .node").forEach(n=>{n.classList.toggle("hot",!!c&&(n===c||linked.has(n.dataset.p||"S"+n.dataset.s)));n.classList.toggle("cur",n===c)});
+  /* fluid: droplets travel each lit branch from the seed out to the paper */
+  if(!matchMedia("(prefers-reduced-motion:reduce)").matches)
+    drops.innerHTML=hot.slice(0,40).map((l,i)=>`<path class="glow loop" pathLength="1" d="${l.getAttribute("d")}" style="animation-delay:${(i*.08).toFixed(2)}s"/>`).join("");
+}
+let focusTimer;
+$("#graph").addEventListener("mousemove",e=>{
+  const c=e.target.closest(".node"),tip=$("#gtip"),svg=$("#graph");
+  const key=c?(c.dataset.p||"S"+c.dataset.s):null;
+  clearTimeout(focusTimer);
+  if(key!==hotKey)focusTimer=setTimeout(()=>setFocus(c),c?110:350);
+  if(!c){tip.style.opacity=0;return}
+  const box=svg.parentElement.getBoundingClientRect();
+  if(c.dataset.p){const p=P.find(x=>x.id===c.dataset.p),f=FIG[p.id];tip.innerHTML=`<b>Rank ${ranked(st.w).indexOf(p.id)+1}</b> · score ${pct(rel(p))}<br><b>${esc(p.t)}</b><br>${p.y??"—"} · ${esc(p.v||"")}${f&&f.desc?`<br><span style="opacity:.75">figure: ${esc(f.desc.slice(0,110))}</span>`:""}`}
+  else{const s=SEEDS.find(x=>x.id==c.dataset.s);tip.innerHTML=`<b>Seed ${s.id}</b> (a paper you provided)<br>${esc(s.t)}`}
+  tip.style.left=Math.min(e.clientX-box.left+14,box.width-290)+"px";tip.style.top=(e.clientY-box.top+14)+"px";tip.style.opacity=1;
+});
+$("#graph").addEventListener("mouseleave",()=>{clearTimeout(focusTimer);setFocus(null);$("#gtip").style.opacity=0});
+$("#graph").addEventListener("click",e=>{
+  const c=e.target.closest("[data-p]");if(!c)return;
+  st.open.add(c.dataset.p);$('.tab[data-tab="ranked"]').click();renderRows();
+  document.querySelector(`tr[data-id="${CSS.escape(c.dataset.p)}"]`)?.scrollIntoView({block:"center"});
+});
+
+/* clusters */
+function renderClusters(){
+  const order=ranked(st.w);
+  $("#clusters").innerHTML=Object.entries(CL).map(([k,n])=>{
+    const ps=order.map(id=>P.find(p=>p.id===id)).filter(p=>p.cl===k);
+    const allRej=ps.every(p=>st.dec[p.id]==="r");
+    return `<div class="card cl ${allRej?"rej":""}"><div class="card-h"><span>${n}</span><span class="mono faint">${ps.length} papers</span></div>
+      <ol>${ps.map(p=>`<li><span class="num faint">#${order.indexOf(p.id)+1}</span><span>${esc(p.t)}</span><span class="num muted">${pct(rel(p))}</span></li>`).join("")}</ol>
+      <div style="padding:8px 12px;border-top:1px solid var(--border)"><div class="seg"><button data-ca="${k}">Accept all</button><button data-cr="${k}">Reject all</button></div></div></div>`;
+  }).join("");
+  const ys=[...P,...SEEDS].map(p=>p.y).filter(Boolean),Y=[];const yb=Math.max(...ys,new Date().getFullYear());for(let y=Math.max(Math.min(...ys,yb-10),yb-14);y<=yb;y++)Y.push(y);
+  $("#tl").innerHTML=Y.map(y=>`<div title="${y}">${SEEDS.filter(s=>s.y===y).map(()=>'<span class="sd"></span>').join("")}${P.filter(p=>p.y===y).map(()=>"<span></span>").join("")}</div>`).join("");
+  $("#tl").style.gridTemplateColumns=$("#tlx").style.gridTemplateColumns=`repeat(${Y.length},minmax(0,1fr))`;
+  $("#tlx").innerHTML=Y.map(y=>`<span>'${String(y).slice(2)}</span>`).join("");
+}
+$("#clusters").addEventListener("click",e=>{
+  const a=e.target.closest("[data-ca],[data-cr]");if(!a)return;
+  const k=a.dataset.ca||a.dataset.cr,v=a.dataset.ca?"a":"r";
+  P.filter(p=>p.cl===k).forEach(p=>st.dec[p.id]=v);renderAll();
+});
+
+/* eval */
+/* LOO rows: [seed, keyword, web, graph, semantic, hybrid] rank of the hidden seed; recall@k is derived from them. */
+const CH=["keyword","web","graph","semantic","hybrid"];
+const recall=k=>Object.fromEntries(CH.map((c,i)=>[c,LOO.length?LOO.filter(r=>r[i+1]!=null&&r[i+1]<=k).length/LOO.length:0]));
+function renderEval(){
+  const r=recall(st.k);
+  $("#bars").innerHTML=CH.map(c=>`<div class="brow ${c==="hybrid"?"hyb":""}"><span>${c}</span><div class="tr"><div class="fill" style="width:${r[c]*100}%"></div></div><b>${Math.round(r[c]*100)}%</b></div>`).join("");
+  $("#mult").textContent=r.keyword?(r.hybrid/r.keyword).toFixed(1)+"×":"—";
+  $("#loo").innerHTML=`<thead><tr><th>Hidden seed</th><th>keyword</th><th>web</th><th>graph</th><th>semantic</th><th>hybrid</th></tr></thead><tbody>${LOO.length?"":`<tr><td colspan="6" class="empty">Run discovery with at least 2 seeds to evaluate.</td></tr>`}${LOO.map(([s,...rs])=>`<tr><td><span class="mono faint">S${s}</span> ${esc(((SEEDS.find(x=>x.id===s)||{}).t||"").slice(0,38))}…</td>${rs.map(v=>`<td class="${v&&v<=st.k?"hit":"miss"}">${v??"—"}</td>`).join("")}</tr>`).join("")}</tbody>`;
+}
+$("#kpick").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.k=+b.dataset.k;$$("#kpick button").forEach(x=>x.className=x===b?"on a":"");renderEval()});
+
+/* export */
+function key(p){return ((p.au||"anon").split(" ")[0].toLowerCase().replace(/[^a-z]/g,"")||"anon")+(p.y||"")}
+const link=p=>p.doi?`https://doi.org/${p.doi}`:(p.url||"");
+function renderExport(){
+  const acc=ranked(st.w).map(id=>P.find(p=>p.id===id)).filter(p=>st.dec[p.id]==="a");
+  $("#nAcc").textContent=acc.length;$("#expCount").textContent=acc.length+" papers";
+  $("#expList").innerHTML=acc.length?`<ol>${acc.map(p=>`<li>${p.flag?`<span class="badge err">${esc(p.flag)}</span> `:""}${esc(p.t)} <span class="faint">(${p.y??"n.d."})</span></li>`).join("")}</ol>`:'<div class="empty">Accept rows in the Ranked tab to build the list.</div>';
+  let out="";
+  if(st.fmt==="md")out=`# Reading list: ${$("#qInput").value.trim()||"Medicap"}\n\n`+acc.map((p,i)=>`${i+1}. ${p.flag?`**[${p.flag.toUpperCase()}]** `:""}${p.au} (${p.y??"n.d."}). *${p.t}*. ${p.v}. ${link(p)}`).join("\n");
+  if(st.fmt==="bib")out=`@comment{Reading list: ${($("#qInput").value.trim()||"Medicap").replace(/[{}]/g,"")}}\n\n`+acc.map(p=>`@article{${key(p)},\n  title   = {${p.t}},\n  author  = {${p.au.replace(/, /g," and ")}},\n  journal = {${p.v}},\n  year    = {${p.y}},\n  doi     = {${p.doi}},\n  url     = {${link(p)}}${p.flag?`,\n  note    = {${p.flag.toUpperCase()}}`:""}\n}`).join("\n\n");
+  if(st.fmt==="ris")out=acc.map(p=>`TY  - JOUR\nTI  - ${p.t}\n${p.au.split(", ").map(a=>"AU  - "+a).join("\n")}\nJO  - ${p.v}\nPY  - ${p.y}\nN1  - Reading list: ${$("#qInput").value.trim()||"Medicap"}\nDO  - ${p.doi}\nUR  - ${link(p)}${p.flag?`\nN1  - ${p.flag.toUpperCase()}`:""}\nER  -`).join("\n\n");
+  $("#expOut").textContent=acc.length?out:"// nothing accepted yet";
+}
+$("#fmt").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.fmt=b.dataset.fmt;$$("#fmt button").forEach(x=>x.className=x===b?"on a":"");renderExport()});
+$("#copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText($("#expOut").textContent);$("#copyBtn").textContent="Copied"}catch{$("#copyBtn").textContent="Copy failed"}setTimeout(()=>$("#copyBtn").textContent="Copy",1400)};
+
+/* run discovery against the backend */
+function setStages(d){
+  const s=d.stats;
+  STAGES[1]=["expand","ok",String(s.graph_candidates)];
+  STAGES[2]=["semantic","ok","tf-idf"];
+  STAGES[3]=["judge",JUDGE?"ok":"warn",JUDGE?String(s.judged):"off"];
+  STAGES[4]=["web",TAVILY?"ok":"warn",TAVILY?String(s.web_hits):"off"];
+  STAGES[5]=["rank","ok",String(s.returned)];
+  renderStages();
+}
+function renderWeb(){
+  const w=WEBCTX||{},el=$("#webctx"),srcs=(w.sources||[]).filter(s=>safeUrl(s.url));
+  el.hidden=!(w.answer||srcs.length);
+  el.innerHTML=`<div class="card-h"><span>Web context <span class="faint">tavily</span></span><span class="mono faint">${srcs.length} sources</span></div><div style="padding:8px 12px">${w.answer?`<p style="margin:0 0 6px">${esc(w.answer)}</p>`:""}<ul class="sup">${srcs.map(s=>`<li><a href="${safeUrl(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> <span class="faint">${esc(s.domain)} · ${s.score_pct}%</span></li>`).join("")}</ul></div>`;
+}
+$("#runBtn").onclick=async()=>{
+  if(!SEEDS.length)return;
+  const btn=$("#runBtn");btn.disabled=true;
+  $$(".stg").forEach((el,i)=>{if(i>0)el.className="stg run"});
+  status(`Running discovery on ${SEEDS.length} seeds: citation graph, keyword search, Tavily…`);
+  const t0=performance.now();
+  try{
+    const d=await api("/api/medicap/discover",{question:$("#qInput").value.trim(),seeds:SEEDS.map(s=>s.wid)});
+    RES=d;P=d.papers;CL=d.clusters;WEBCTX=d.web_context||{};JUDGE=d.judge;
+    SEEDS=d.seeds.map(s=>({id:s.n,wid:s.id,t:s.t,m:`${s.y} · ${s.v}`,y:s.y,ok:1}));
+    LOO=d.loo.map(r=>[r.seed,r.keyword,r.web,r.graph,r.semantic,r.hybrid]);
+    st.dec={};st.open=new Set();st.prevW=null;base=ranked();
+    syncW();setStages(d);renderAll();renderEval();renderWeb();
+    $("#runid").textContent=`run ${new Date().toLocaleTimeString()} · live`;
+    const topics=[...new Set(d.seeds.map(s=>s.topic).filter(Boolean))];
+    $("#concepts").innerHTML=topics.map((x,i)=>`<span class="badge ${i<2?"acc":""}">${esc(x)}</span>`).join("")||'<span class="faint">none</span>';
+    $("#subq").innerHTML=(d.queries||[]).map(q=>`<span class="badge" title="${esc(q.channel)}">${esc(q.channel)}: ${esc(q.q)}</span>`).join("");
+    $("#looInfo").textContent=`${d.seeds.length} seeds · ${d.stats.pool} candidates`;
+    status(`${d.stats.returned} candidates ranked from a pool of ${d.stats.pool} (${d.stats.graph_candidates} graph neighbours, ${d.stats.keyword_hits} keyword, ${d.stats.web_hits} Tavily) in ${((performance.now()-t0)/1000).toFixed(1)}s.`,"ok");
+  }catch(err){status("Discovery failed: "+err.message,"err");renderStages()}
+  finally{btn.disabled=!SEEDS.length}
+};
+["#qInput","#seedInput"].forEach(s=>$(s).addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();if(!$("#runBtn").disabled)$("#runBtn").click()}}));
+
+/* theme */
+$("#theme").onclick=()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=dark?"light":"dark";try{localStorage.setItem("pc-theme",r.dataset.theme)}catch{}};
+try{const t=localStorage.getItem("pc-theme");if(t)document.documentElement.dataset.theme=t}catch{}
+
+function renderAll(){renderRows();renderClusters();renderExport();if(st.tab==="graph")renderGraph(false)}
+syncW();renderStages();renderAll();renderEval();parseSeeds();
+api("/api/medicap/status").then(s=>{JUDGE=s.judge;TAVILY=s.tavily;syncW()}).catch(()=>{});
+
+/* ---------- Ask MedicUp: chat grounded on this run (/api/followup) or the whole literature (/api/query) ---------- */
+const CHAT={mode:"papers",msgs:[],busy:false,llm:null};
+const mdh=s=>{const h=window.marked?marked.parse(s||""):esc(s||"");return window.DOMPurify?DOMPurify.sanitize(h):h};
+const chatPapers=()=>P.filter(p=>!p.id.startsWith("web:")&&st.dec[p.id]!=="r").slice(0,25);
+const paperLink=p=>p.doi?"https://doi.org/"+p.doi:(p.url||"");
+fetch("/api/medicap/status").then(r=>r.json()).then(s=>{CHAT.llm=!!s.llm;renderChat()}).catch(()=>{});
+function chatScope(){
+  if(CHAT.mode==="lit")return "cited answer from OpenAlex + Tavily";
+  const n=chatPapers().length;return n?`grounded on the top ${n} ranked papers`:"run discovery first";
+}
+function renderChat(){
+  $$("#cmode button").forEach(b=>{const on=b.dataset.m===CHAT.mode;b.classList.toggle("on",on);b.classList.toggle("a",on)});
+  $("#cscope").textContent=chatScope();
+  const warn=CHAT.llm===false?"Chat needs an LLM: set <code>NEBIUS_API_KEY</code> in the server's <code>.env</code> and restart.":(CHAT.mode==="papers"&&!chatPapers().length?"Run discovery first — answers are grounded on the ranked papers.":"");
+  $("#cwarn").hidden=!warn;$("#cwarn").innerHTML=warn;
+  $("#cin").placeholder=CHAT.mode==="papers"?"Ask about the ranked papers…":"Ask a clinical or research question…";
+  $("#cnote").textContent=CHAT.mode==="papers"?"Answers cite only the papers in this run · click a number to open the paper":"Cited answer from the literature · web sources rank below papers";
+  $("#csend").disabled=CHAT.busy;
+  const th=$("#thread");
+  if(!CHAT.msgs.length){
+    const q=($("#qInput")||{}).value||"";
+    const s=CHAT.mode==="papers"?["Summarise the main findings across the top papers.","Which papers disagree with each other, and why?","What study designs support the strongest conclusions?"]:[q||"What mechanisms make CAR-T therapy fail in solid tumors?","What are the latest strategies to overcome T-cell exhaustion?"];
+    th.innerHTML=`<div class="chat-empty"><h3>${CHAT.mode==="papers"?"Ask about this run":"Ask the literature"}</h3><div>${CHAT.mode==="papers"?"Every claim is cited to a ranked paper.":"A cited answer from OpenAlex, with web context from Tavily."}</div><div class="sugg">${s.map(x=>`<button type="button" data-sq="${esc(x)}">${esc(x)}</button>`).join("")}</div></div>`;
+    return;
+  }
+  th.innerHTML=CHAT.msgs.map(m=>{
+    if(m.role==="user")return `<div class="umsg"><div class="ububble">${esc(m.text)}</div></div>`;
+    const head=`<div class="aname">MedicUp<small>${m.kind==="lit"?"Literature":"This run"}</small></div>`;
+    if(m.status==="running")return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="thinking"><i></i>${m.kind==="lit"?"Searching the literature…":"Reading the papers…"}</div></div></div>`;
+    if(m.status==="error")return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="chat-warn">${esc(m.error)}</div></div></div>`;
+    const body=mdh(m.answer).replace(/\[\^(\d+)\]/g,(_,n)=>{const c=m.refs[+n-1];return `<sup class="cite" data-ci="${m.id}" data-n="${n}" title="${c?esc(c.title):""}">${n}</sup>`});
+    const used=[...new Set([...(m.answer||"").matchAll(/\[\^(\d+)\]/g)].map(x=>+x[1]))].sort((a,b)=>a-b).filter(n=>m.refs[n-1]);
+    const srcs=used.map(n=>{const c=m.refs[n-1];return c.pid?`<button type="button" data-goto="${esc(c.pid)}" title="${esc(c.title)}"><span class="n">${n}</span><span>${esc(c.title)}</span></button>`:`<a href="${esc(c.url||"#")}" target="_blank" rel="noopener" title="${esc(c.title)}"><span class="n">${n}</span><span>${esc(c.title)}</span></a>`}).join("");
+    return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="prose">${body}</div>${srcs?`<div class="srcs">${srcs}</div>`:""}</div></div>`;
+  }).join("");
+  th.scrollTop=th.scrollHeight;
+}
+function gotoPaper(pid){if(!P.find(p=>p.id===pid))return;st.open.add(pid);$('.tab[data-tab="ranked"]').click();renderRows();setTimeout(()=>{const r=document.querySelector(`tr[data-id="${CSS.escape(pid)}"]`);r&&r.scrollIntoView({block:"center",behavior:"smooth"})},60)}
+async function sendChat(text){
+  text=(text||"").trim();if(!text||CHAT.busy)return;
+  const kind=CHAT.mode,hist=[];
+  CHAT.msgs.forEach((m,i)=>{if(m.role==="assistant"&&m.kind===kind&&m.answer){hist.push({role:"user",content:CHAT.msgs[i-1].text},{role:"assistant",content:m.answer.slice(0,4000)})}});
+  const m={id:"c"+Date.now(),role:"assistant",kind,status:"running",answer:"",refs:[]};
+  CHAT.msgs.push({role:"user",text},m);CHAT.busy=true;$("#cin").value="";renderChat();
+  try{
+    if(kind==="papers"){
+      const ps=chatPapers();if(!ps.length)throw new Error("Run discovery first: answers are grounded on the ranked papers.");
+      const body={question:text,history:hist,papers:ps.map((p,i)=>({n:i+1,openalex_id:p.id,title:p.t,year:p.y,abstract:p.abstract||"",venue:p.v,links:{doi:p.doi?"https://doi.org/"+p.doi:null,openalex:p.url||null}}))};
+      const r=await fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if(!r.ok)throw new Error(r.status===503?"No LLM configured on the server: set NEBIUS_API_KEY in .env and restart.":"Follow-up failed (HTTP "+r.status+").");
+      const d=await r.json();m.answer=d.answer||"";m.refs=ps.map(p=>({pid:p.id,title:p.t,url:paperLink(p)}));
+    }else{
+      const r=await fetch("/api/query",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,history:hist})});
+      if(!r.ok)throw new Error("Search failed (HTTP "+r.status+").");
+      const d=await r.json();m.answer=d.answer||"";
+      m.refs=(d.citations||[]).map(c=>{const id=c.openalex_id||c.id||"",inRun=P.find(p=>p.id===id||(c.doi&&p.doi&&String(c.doi).toLowerCase().endsWith(p.doi.toLowerCase())));return {pid:inRun?inRun.id:null,title:c.title||"Untitled",url:c.url||(c.doi?(String(c.doi).startsWith("http")?c.doi:"https://doi.org/"+c.doi):"")}});
+    }
+    m.status="done";
+  }catch(e){m.status="error";m.error=e.message}
+  CHAT.busy=false;renderChat();
+}
+$("#cmode").onclick=e=>{const b=e.target.closest("button[data-m]");if(!b)return;CHAT.mode=b.dataset.m;renderChat()};
+$("#csend").onclick=()=>sendChat($("#cin").value);
+$("#cin").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat($("#cin").value)}});
+$("#cin").addEventListener("input",e=>{e.target.style.height="auto";e.target.style.height=Math.min(160,e.target.scrollHeight)+"px"});
+$("#cclear").onclick=()=>{CHAT.msgs=[];renderChat()};
+$("#thread").addEventListener("click",e=>{
+  const sq=e.target.closest("[data-sq]");if(sq)return sendChat(sq.dataset.sq);
+  const g=e.target.closest("[data-goto]");if(g)return gotoPaper(g.dataset.goto);
+  const c=e.target.closest("sup.cite");if(c){const m=CHAT.msgs.find(x=>x.id===c.dataset.ci),r=m&&m.refs[+c.dataset.n-1];if(r){r.pid?gotoPaper(r.pid):r.url&&open(r.url,"_blank","noopener")}}
+});
+$('.tab[data-tab="chat"]').addEventListener("click",()=>{renderChat();setTimeout(()=>$("#cin").focus(),0)});
+renderChat();
+</script>
+</body>
+</html>

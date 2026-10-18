@@ -42,7 +42,7 @@ def load_config(path: Optional[str] = None, *, default: str = "pipeline.yaml") -
     cfg.setdefault("retrieval", {"routes": {}})
     cfg.setdefault("stages", {})
     cfg.setdefault("merge", {})
-    cfg.setdefault("llm", {"default_provider": "openrouter", "providers": {}})
+    cfg.setdefault("llm", {"default_provider": "nebius", "providers": {}})
     return cfg
 
 

@@ -16,6 +16,7 @@ from openoe.llm.prompts import PromptManager
 from openoe.utils.text import truncate
 
 log = logging.getLogger(__name__)
+_BARE_NUMERIC_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 
 
 # ---------------------------------------------------------------------------
@@ -30,10 +31,11 @@ async def generate_answer(
     llm: LLMClient,
     prompts: PromptManager,
     history: List[Dict[str, str]] | None = None,
+    web_sources: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """Returns ``{"answer": ..., "markdown": ..., "citations": [...], "trace": LLMTrace}``."""
     # Build context + source list
-    context, sources = _build_context(papers, guidelines)
+    context, sources = _build_context(papers, guidelines, web_sources)
     log.info("Stage 5 context: %d papers + %d guidelines = %d sources", len(papers), len(guidelines), len(sources))
     rag_json = json.dumps(context, ensure_ascii=False, indent=2)
 
@@ -57,6 +59,7 @@ async def generate_answer(
 
     answer = _fix_chinese_citations(result.content.strip())
     answer = _remove_trailing_references(answer)
+    answer = _BARE_NUMERIC_CITATION_RE.sub("", answer)
     cited_ids = _extract_cited_ids(answer)
     log.info("Stage 5 cited_ids=%s from %d sources", cited_ids, len(sources))
     answer, cited = _reindex(answer, sources, cited_ids)
@@ -76,7 +79,7 @@ async def generate_answer(
 # ---------------------------------------------------------------------------
 
 def _build_context(
-    papers: List[Document], guidelines: List[Document],
+    papers: List[Document], guidelines: List[Document], web_sources: List[Dict[str, Any]] | None = None,
 ) -> Tuple[List[Dict], List[Dict]]:
     ctx: List[Dict[str, Any]] = []
     sources: List[Dict[str, Any]] = []
@@ -84,12 +87,16 @@ def _build_context(
     idx = 1
     for d in papers:
         ctx.append({"id": idx, "type": "paper", "title": d.title, "abstract": truncate(d.content, 900), "metadata": d.metadata})
-        sources.append({"doc_type": "paper", "title": d.title, **d.metadata})
+        sources.append({"doc_type": "paper", "title": d.title, **d.metadata, "score_pct": d.score_pct})
         idx += 1
     for d in guidelines:
         chunks = d.relevant_chunks or [truncate(d.content, 2000)]
         ctx.append({"id": idx, "type": "guideline", "title": d.title, "relevant_chunks": chunks})
-        sources.append({"doc_type": "guideline", "title": d.title, "relevant_chunks": chunks, **d.metadata})
+        sources.append({"doc_type": "guideline", "title": d.title, "relevant_chunks": chunks, **d.metadata, "score_pct": d.score_pct})
+        idx += 1
+    for w in web_sources or []:
+        ctx.append({"id": idx, "type": "web", "title": w["title"], "url": w["url"], "snippet": w.get("snippet", "")})
+        sources.append({"doc_type": "web", **w})
         idx += 1
     return ctx, sources
 
@@ -181,12 +188,14 @@ _BADGE_COLORS = {1: "brightgreen", 2: "green", 3: "yellow", 4: "orange", 5: "red
 
 
 def _format_markdown(question: str, answer: str, cited: List[Dict]) -> str:
-    md = [f"## 🤖回答:\n\n{answer}\n\n---\n\n"]
+    md = [f"## Answer\n\n{answer}\n\n---\n\n"]
     if cited:
-        md.append("## 🔗参考文献\n\n")
+        md.append("## References\n\n")
         for i, s in enumerate(cited, 1):
             if s.get("doc_type") == "guideline":
                 md.append(_fmt_guideline(i, s))
+            elif s.get("doc_type") == "web":
+                md.append(_fmt_web(i, s))
             else:
                 md.append(_fmt_paper(i, s))
     return "".join(md)
@@ -210,6 +219,9 @@ def _fmt_paper(i: int, s: Dict) -> str:
             doi_norm = doi_norm[len(p):].strip()
             break
     doi_link = f" | [DOI](https://doi.org/{quote(doi_norm)})" if doi_norm else ""
+    url = str(s.get("url", ""))
+    if not pmid_link and not doi_link and url.startswith(("http://", "https://")):
+        doi_link = f"[{s.get('domain') or 'Source'}]({url})"
 
     info = journal or ""
     if if_:
@@ -225,6 +237,8 @@ def _fmt_paper(i: int, s: Dict) -> str:
             info = f"{badge} {info}"
             break
 
+    if s.get("score_pct"):
+        info = f"{info} · Score {s['score_pct']}%" if info else f"Score {s['score_pct']}%"
     return f"#### ^{i}: {title}\n\n{pmid_link}{doi_link} | {info}\n\n"
 
 
@@ -232,4 +246,11 @@ def _fmt_guideline(i: int, s: Dict) -> str:
     title = s.get("title", "N/A")
     n = len(s.get("relevant_chunks", []))
     badge = "![Guideline](https://img.shields.io/badge/Guideline-red)"
-    return f"#### ^{i}: {title}\n\n临床指南{badge}，相关段落：{n}\n\n"
+    score = f" · Score {s['score_pct']}%" if s.get("score_pct") else ""
+    return f"#### ^{i}: {title}\n\nClinical guideline {badge}, relevant passages: {n}{score}\n\n"
+
+
+def _fmt_web(i: int, s: Dict) -> str:
+    title = s.get("title", "N/A")
+    score = f" · Score {s['score_pct']}%" if s.get("score_pct") else ""
+    return f"#### ^{i}: {title}\n\n[{s.get('domain') or 'web'}]({s.get('url', '')}) | Web{score}\n\n"

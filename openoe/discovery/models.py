@@ -1,0 +1,140 @@
+"""Models and OpenAlex conversion helpers for literature discovery."""
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
+
+from pydantic import BaseModel, Field, model_validator
+
+from openoe.sources.openalex import _rebuild_abstract
+
+
+class Paper(BaseModel):
+    openalex_id: str
+    doi: Optional[str] = None
+    pmid: Optional[str] = None
+    title: str
+    abstract: str = ""
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    authors: List[str] = Field(default_factory=list)
+    cited_by_count: int = 0
+    is_oa: bool = False
+    is_retracted: bool = False
+    oa_url: Optional[str] = None
+    topic: Optional[str] = None
+    field: Optional[str] = None
+    type: Optional[str] = None
+    links: Dict[str, Optional[str]] = Field(default_factory=dict)
+    referenced_works: List[str] = Field(default_factory=list, exclude=True)
+    related_works: List[str] = Field(default_factory=list, exclude=True)
+
+    def to_api_dict(self) -> Dict[str, Any]:
+        return self.model_dump(exclude={"referenced_works", "related_works"})
+
+
+class DiscoverRequest(BaseModel):
+    question: str = ""
+    seeds: List[str] = Field(default_factory=list)
+    disliked: List[str] = Field(default_factory=list)
+    limit: int = 20
+
+    @model_validator(mode="after")
+    def _question_or_seeds(self) -> "DiscoverRequest":
+        self.question = self.question.strip()
+        self.seeds = [s.strip() for s in self.seeds if s and s.strip()]
+        if not self.question and not self.seeds:
+            raise ValueError("Enter a research question or at least one seed paper.")
+        return self
+
+
+class DiscoverResponse(BaseModel):
+    seeds: List[Dict[str, Any]]
+    unresolved: List[str]
+    results: List[Dict[str, Any]]
+    web_context: List[Dict[str, str]]
+    stats: Dict[str, Any]
+    timings: Dict[str, float]
+    errors: List[str]
+
+
+class FollowupRequest(BaseModel):
+    question: str
+    history: List[Dict[str, str]] = Field(default_factory=list)
+    papers: List[Dict[str, Any]]
+
+
+def short_openalex_id(value: Any) -> str:
+    if not value:
+        return ""
+    text = str(value).rstrip("/")
+    match = re.search(r"(W\d+)$", text)
+    return match.group(1) if match else text
+
+
+def normalize_doi(value: Any) -> Optional[str]:
+    if not value:
+        return None
+    text = str(value).strip()
+    text = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", text, flags=re.I)
+    text = re.sub(r"^doi:\s*", "", text, flags=re.I)
+    text = text.rstrip(".,;:)]}>\"'")
+    return text or None
+
+
+def _pmid_from_ids(ids: Any) -> Optional[str]:
+    value = (ids or {}).get("pmid")
+    if not value:
+        return None
+    match = re.search(r"(?:pubmed\.ncbi\.nlm\.nih\.gov/)?(\d+)", str(value), flags=re.I)
+    return match.group(1) if match else None
+
+
+def paper_from_work(work: Dict[str, Any]) -> Optional[Paper]:
+    openalex_id = short_openalex_id(work.get("id"))
+    title = str(work.get("title") or work.get("display_name") or "").strip()
+    if not openalex_id or not title:
+        return None
+
+    raw_authors = [
+        str((entry.get("author") or {}).get("display_name") or "").strip()
+        for entry in (work.get("authorships") or [])
+    ]
+    authors = [name for name in raw_authors if name][:3]
+    if len([name for name in raw_authors if name]) > 3:
+        authors.append("et al.")
+
+    doi = normalize_doi(work.get("doi"))
+    pmid = _pmid_from_ids(work.get("ids"))
+    location = work.get("primary_location") or {}
+    source = location.get("source") or {}
+    oa = work.get("open_access") or {}
+    primary_topic = work.get("primary_topic") or {}
+    topic_field = primary_topic.get("field") or {}
+    doi_url = f"https://doi.org/{quote(doi, safe='/')}" if doi else None
+    pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{quote(pmid)}/" if pmid else None
+    return Paper(
+        openalex_id=openalex_id,
+        doi=doi,
+        pmid=pmid,
+        title=title,
+        abstract=_rebuild_abstract(work.get("abstract_inverted_index") or {}),
+        year=work.get("publication_year"),
+        venue=source.get("display_name"),
+        authors=authors,
+        cited_by_count=int(work.get("cited_by_count") or 0),
+        is_oa=bool(oa.get("is_oa")),
+        is_retracted=bool(work.get("is_retracted", False)),
+        oa_url=oa.get("oa_url"),
+        topic=primary_topic.get("display_name"),
+        field=topic_field.get("display_name"),
+        type=work.get("type"),
+        links={
+            "openalex": work.get("id"),
+            "doi": doi_url,
+            "pubmed": pubmed_url,
+        },
+        referenced_works=[short_openalex_id(item) for item in (work.get("referenced_works") or [])],
+        related_works=[short_openalex_id(item) for item in (work.get("related_works") or [])],
+    )
