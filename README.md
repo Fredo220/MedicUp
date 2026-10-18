@@ -176,6 +176,17 @@ Models are accessed via [OpenRouter](https://openrouter.ai/models) — swap any 
 | `GET` | `/api/traces/{id}` | Execution trace |
 | `GET` | `/health` | Health check |
 
+### 🚢 Deploy on Nebius (Draft — to finalize)
+
+Build and push the image to Nebius Container Registry (authenticate Docker with your registry credentials first):
+
+```bash
+docker build -t cr.<region>.nebius.cloud/<registry-id>/medicup:<tag> .
+docker push cr.<region>.nebius.cloud/<registry-id>/medicup:<tag>
+```
+
+Create a Nebius Serverless AI endpoint from this image, configure its container port as `8000`, and provide `NEBIUS_API_KEY`, `TAVILY_API_KEY`, `OPENALEX_EMAIL`, and `OPENALEX_API_KEY` as secret environment variables. Do not bake credentials into the image.
+
 ### 📁 Project Structure
 
 ```
