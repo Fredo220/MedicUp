@@ -3,177 +3,242 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MedicUp · literature discovery that explains itself</title>
+<title>MedicUp · the mathematics of medical discovery</title>
+<meta name="description" content="Seed-based literature discovery for health and medicine. Citation graphs, semantic similarity and transparent 1–100% scores.">
 <link rel="icon" href="/static/brand/favicon.png">
-<meta name="description" content="Start from the papers you trust. MedicUp follows citations, searches the literature and the web, and ranks what you missed with transparent 1–100% scores.">
 <style>
-:root{--bg:#fbfaf7;--fg:#141414;--muted:#5f5d58;--faint:#97948d;--line:#e7e3da;--card:#ffffff;--accent:#0a6cff;--radius:22px;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+:root{--bg:#fff;--ink:#0b1b3f;--fg:#141824;--muted:#5b6475;--faint:#98a1b2;--line:#e9edf3;--soft:#f5f8fc;--blue:#0a6cff;--teal:#13c39b;--grad:linear-gradient(100deg,#0a6cff,#13c39b);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--ease:cubic-bezier(.22,.8,.2,1)}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-nav{position:sticky;top:0;z-index:10;backdrop-filter:saturate(1.4) blur(14px);background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid transparent;transition:border-color .2s}
-nav.scrolled{border-color:var(--line)}
-nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.01em}
-.logo svg{width:26px;height:26px}
-.links{display:flex;gap:22px;color:var(--muted);font-size:14.5px}
-.links a:hover{color:var(--fg)}
+#bar{position:fixed;top:0;left:0;height:2px;width:0;background:var(--grad);z-index:40}
+nav{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.78);backdrop-filter:saturate(1.6) blur(16px);border-bottom:1px solid transparent;transition:border-color .3s}
+nav.s{border-color:var(--line)}
+nav .wrap{display:flex;align-items:center;gap:28px;height:66px}
+nav img{height:32px;display:block}
+.links{display:flex;gap:24px;font-size:14.5px;color:var(--muted)}.links a:hover{color:var(--ink)}
 .sp{flex:1}
-.btn{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font-weight:550;font-size:15px;transition:transform .15s,opacity .15s,background .15s}
-.btn:hover{transform:translateY(-1px)}
-.btn.primary{background:var(--fg);color:var(--bg)}
-.btn.ghost{border:1px solid var(--line);color:var(--fg)}
-.btn.ghost:hover{background:var(--card)}
-.btn.sm{height:36px;padding:0 16px;font-size:14px}
-header.hero{padding:88px 0 40px;text-align:center}
-.eyebrow{display:inline-flex;gap:8px;align-items:center;font:500 12.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
-.eyebrow i{width:7px;height:7px;border-radius:50%;background:#13c39b;box-shadow:0 0 0 4px color-mix(in srgb,#13c39b 20%,transparent)}
-h1{font:400 clamp(44px,7.4vw,92px)/1.02 var(--serif);letter-spacing:-.025em;margin:22px auto 18px;max-width:14ch}
-h1 em{font-style:italic;color:var(--muted)}
-.lede{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:640px;margin:0 auto 32px}
-.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.note{margin-top:18px;font-size:13.5px;color:var(--faint)}
-.paint{position:relative;border-radius:var(--radius);overflow:hidden;background:#222;box-shadow:0 30px 80px -30px rgba(0,0,0,.45)}
-.paint img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.06);transition:transform 1.6s cubic-bezier(.2,.7,.2,1)}
-.paint.in img{transform:scale(1)}
-.paint figcaption{position:absolute;left:16px;bottom:14px;font:500 11.5px var(--mono);color:rgba(255,255,255,.82);text-shadow:0 1px 6px rgba(0,0,0,.6)}
-.hero-img{margin:56px auto 0;aspect-ratio:16/9;max-height:640px}
-.hero-img img{object-position:50% 40%}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:72px 0 24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.stats div{padding:30px 10px;text-align:center}
-.stats div+div{border-left:1px solid var(--line)}
-.stats b{display:block;font:400 clamp(30px,4vw,46px)/1.1 var(--serif);letter-spacing:-.02em}
-.stats span{color:var(--muted);font-size:14px}
-section{padding:96px 0}
-.split{display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center}
-.split.rev{grid-template-columns:1fr 1.05fr}
-.split.rev .paint{order:2}
-.kicker{font:500 12.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
-h2{font:400 clamp(34px,4.6vw,56px)/1.06 var(--serif);letter-spacing:-.02em;margin:12px 0 18px}
-p.big{font-size:18px;color:var(--muted);margin:0 0 26px;max-width:52ch}
-.tall{aspect-ratio:4/5}
-.wide{aspect-ratio:21/9}
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
-.step{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
-.step .n{font:500 12px var(--mono);color:var(--faint)}
-.step h3{font:600 17px/1.3 var(--sans);margin:10px 0 6px;letter-spacing:-.01em}
-.step p{margin:0;color:var(--muted);font-size:14.5px}
-.feat{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:36px}
-.feat div{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--card)}
-.feat b{display:block;font-size:15px;margin-bottom:4px}
-.feat span{font-size:13.5px;color:var(--muted)}
-.quote{text-align:center;max-width:900px;margin:0 auto}
-.quote blockquote{font:400 clamp(28px,3.8vw,46px)/1.2 var(--serif);letter-spacing:-.015em;margin:28px 0 22px}
-.quote cite{font-style:normal;color:var(--muted);font-size:15px}
-.band{position:relative;margin-top:56px}
-.band .over{position:absolute;inset:auto 0 0 0;padding:32px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.65));font:400 clamp(18px,2.2vw,24px)/1.35 var(--serif)}
-.final{text-align:center;padding:120px 0}
-.final h2{max-width:16ch;margin:12px auto 18px}
-.term{display:inline-flex;align-items:center;gap:12px;margin:8px auto 30px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);font:14px var(--mono);color:var(--muted)}
-.term b{color:var(--fg);font-weight:500}
-footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--faint);font-size:13px}
-footer .wrap{display:flex;flex-wrap:wrap;gap:16px 40px;justify-content:space-between}
-footer a{text-decoration:underline;text-underline-offset:3px}
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
-.reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.paint img{transform:none;transition:none}}
-@media (max-width:900px){.links{display:none}.split,.split.rev{grid-template-columns:1fr;gap:32px}.split.rev .paint{order:0}.steps{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr 1fr}header.hero{padding-top:56px}section{padding:64px 0}}
-@media (max-width:520px){.paint figcaption{display:none}.btn.sm{padding:0 12px}.steps,.feat{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stats div+div{border-left:0;border-top:1px solid var(--line)}}
+.btn{position:relative;display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 24px;border-radius:999px;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;transition:box-shadow .3s var(--ease),background .3s}
+.btn.p{background:var(--ink);color:#fff;box-shadow:0 12px 30px -14px rgba(11,27,63,.6)}
+.btn.p::before{content:"";position:absolute;inset:-2px;background:var(--grad);opacity:0;transition:opacity .4s var(--ease);z-index:-1}
+.btn.p{isolation:isolate}.btn.p:hover::before{opacity:1}
+.btn.g{border:1px solid var(--line);color:var(--ink);background:#fff}.btn.g:hover{background:var(--soft)}
+.btn .ar{transition:transform .3s var(--ease)}.btn:hover .ar{transform:translateX(4px)}
+.btn.sm{height:38px;padding:0 18px;font-size:14px}
+/* hero */
+.hero{position:relative;min-height:calc(100vh - 66px);display:flex;align-items:center;overflow:hidden}
+#net{position:absolute;inset:0;width:100%;height:100%}
+.hero .wrap{position:relative;z-index:2;width:100%}
+.hc{max-width:640px;padding:60px 0;background:radial-gradient(closest-side,rgba(255,255,255,.92),rgba(255,255,255,.75) 60%,transparent);border-radius:40px}
+.tag{display:inline-flex;align-items:center;gap:8px;font:500 12.5px var(--mono);color:var(--muted);border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px}
+.tag i{width:7px;height:7px;border-radius:50%;background:var(--teal);animation:ping 2s var(--ease) infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(19,195,155,.45)}100%{box-shadow:0 0 0 10px rgba(19,195,155,0)}}
+h1{font:600 clamp(44px,6.6vw,84px)/1 var(--sans);letter-spacing:-.045em;color:var(--ink);margin:22px 0 20px}
+h1 .gr{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 .w{display:inline-block;opacity:0;transform:translateY(.35em);filter:blur(8px);animation:rise 1.1s var(--ease) forwards}
+@keyframes rise{to{opacity:1;transform:none;filter:none}}
+.lede{font-size:19px;color:var(--muted);max-width:34ch;margin:0 0 32px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.eq{margin-top:34px;font:15px var(--mono);color:var(--muted)}
+.eq b{color:var(--ink);font-weight:500}
+/* sections */
+section{padding:120px 0}
+.k{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+h2{font:600 clamp(32px,4.2vw,52px)/1.05 var(--sans);letter-spacing:-.035em;color:var(--ink);margin:12px 0 16px}
+.big{font-size:18px;color:var(--muted);max-width:46ch;margin:0}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.panel{position:relative;border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,#fff,var(--soft));padding:32px;box-shadow:0 30px 80px -50px rgba(11,27,63,.35);overflow:hidden}
+/* formula */
+.formula{font:400 clamp(22px,2.6vw,32px)/1.5 var(--serif);color:var(--ink);text-align:center;padding:10px 0 22px}
+.formula .t{display:inline-block;padding:2px 8px;border-radius:10px;transition:background .4s var(--ease),color .4s}
+.formula .t.on{background:rgba(10,108,255,.09);color:var(--blue)}
+.terms{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.term{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff;cursor:default;transition:border-color .3s,transform .4s var(--ease)}
+.term:hover{border-color:var(--blue);transform:translateY(-3px)}
+.term b{font:600 13px var(--mono);color:var(--ink)}.term span{display:block;font-size:13px;color:var(--muted)}
+.gauge{display:flex;align-items:center;gap:26px;margin-top:26px}
+.gauge svg{width:150px;height:150px;flex:none}
+.gauge .v{font:600 44px var(--sans);letter-spacing:-.04em;color:var(--ink)}
+.gauge small{display:block;color:var(--muted);font-size:13.5px}
+input[type=range]{width:100%;accent-color:var(--blue)}
+.sl{display:grid;grid-template-columns:70px 1fr 40px;gap:10px;align-items:center;font:13px var(--mono);color:var(--muted);margin-top:8px}
+/* pipeline */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:56px;position:relative}
+.st{position:relative;border:1px solid var(--line);border-radius:22px;padding:24px;background:#fff;transition:transform .5s var(--ease),box-shadow .5s}
+.st:hover{transform:translateY(-6px);box-shadow:0 24px 50px -30px rgba(11,27,63,.4)}
+.st svg{width:44px;height:44px;margin-bottom:14px}
+.st h3{margin:0 0 4px;font:600 17px var(--sans);color:var(--ink)}.st p{margin:0;font-size:14.5px;color:var(--muted)}
+.st .n{position:absolute;top:18px;right:20px;font:500 12px var(--mono);color:var(--faint)}
+/* chart */
+.chart svg{width:100%;height:auto;display:block}
+.chart .ln{fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 2s var(--ease)}
+.chart.in .ln{stroke-dashoffset:0}
+.chart .pt{opacity:0;transition:opacity .5s 1.6s}.chart.in .pt{opacity:1}
+.legend{display:flex;gap:18px;font-size:13px;color:var(--muted);margin-top:10px}.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+/* cell field */
+.cells{position:relative;height:100%;min-height:340px}
+.cells canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:28px}
+.end{text-align:center;position:relative;overflow:hidden;padding:140px 0}
+.end canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.55}
+.end h2{position:relative;font-size:clamp(38px,5.4vw,68px);max-width:15ch;margin:12px auto 30px}
+.end .btn{position:relative}
+footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--faint);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}footer img{height:22px}
+.rv{opacity:0;transform:translateY(28px);transition:opacity 1s var(--ease),transform 1s var(--ease)}.rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv,h1 .w{opacity:1;transform:none;filter:none}.chart .ln{stroke-dashoffset:0}.chart .pt{opacity:1}}
+@media (max-width:900px){.links{display:none}.split{grid-template-columns:1fr;gap:36px}.flow{grid-template-columns:1fr 1fr}.terms{grid-template-columns:1fr}section{padding:80px 0}}
+@media (max-width:520px){.flow{grid-template-columns:1fr}.gauge{flex-direction:column;align-items:flex-start}nav img{height:26px}.btn.sm{padding:0 14px}}
 </style>
 </head>
 <body>
+<div id="bar"></div>
 <nav id="nav"><div class="wrap">
-  <a class="logo" href="/" aria-label="MedicUp home"><img src="/static/brand/medicup-logo.png" alt="MedicUp" style="height:32px;width:auto;display:block"></a>
-  <div class="links"><a href="#how">How it works</a><a href="#explain">Transparency</a><a href="#evaluate">Evaluation</a><a href="/docs">API</a></div>
+  <a href="/" aria-label="MedicUp home"><img src="/static/brand/medicup-logo.png" alt="MedicUp"></a>
+  <div class="links"><a href="#score">Scoring</a><a href="#method">Method</a><a href="#proof">Evaluation</a><a href="/docs">API</a></div>
   <div class="sp"></div>
-  <a class="btn primary sm" href="/app">Open dashboard</a>
+  <a class="btn p sm" href="/app">Open dashboard</a>
 </div></nav>
 
-<header class="hero wrap">
-  <span class="eyebrow reveal"><i></i>Live on OpenAlex &amp; Tavily</span>
-  <h1 class="reveal">The literature, <em>followed</em> for you.</h1>
-  <p class="lede reveal">Start from the papers you already trust. MedicUp follows their citations, searches the literature and the scholarly web, and ranks what you missed. Every score comes with its reasons.</p>
-  <div class="cta reveal"><a class="btn primary" href="/app">Open the dashboard →</a><a class="btn ghost" href="#how">See how it works</a></div>
-  <div class="note reveal">No account needed. Paste DOIs, PMIDs or titles.</div>
-  <figure class="paint hero-img reveal"><img src="/static/landing/anatomy.jpg" alt="Rembrandt, The Anatomy Lesson of Dr Nicolaes Tulp (1632)" fetchpriority="high"><figcaption>Rembrandt · The Anatomy Lesson of Dr Nicolaes Tulp · 1632</figcaption></figure>
-  <div class="stats reveal">
-    <div><b>3</b><span>discovery channels: citation graph, literature search, scholarly web</span></div>
-    <div><b>1–100%</b><span>scores you can read, re-weight and audit</span></div>
-    <div><b>Leave-one-out</b><span>evaluation on your own seed papers</span></div>
-  </div>
+<header class="hero">
+  <canvas id="net" aria-hidden="true"></canvas>
+  <div class="wrap"><div class="hc">
+    <span class="tag rv"><i></i>Live on OpenAlex · Tavily</span>
+    <h1><span class="w">The</span> <span class="w" style="animation-delay:.08s">mathematics</span> <span class="w" style="animation-delay:.16s">of</span> <span class="w gr" style="animation-delay:.24s">medical</span> <span class="w gr" style="animation-delay:.32s">discovery.</span></h1>
+    <p class="lede rv">Start from papers you trust. MedicUp maps the evidence around them and scores what you missed.</p>
+    <div class="cta rv"><a class="btn p" href="/app">Start discovering <span class="ar">→</span></a><a class="btn g" href="#score">See the math</a></div>
+    <div class="eq rv"><b>score</b> = w<sub>g</sub>·graph + w<sub>s</sub>·semantic + w<sub>l</sub>·judge</div>
+  </div></div>
 </header>
 
-<section id="how"><div class="wrap">
-  <div class="split">
-    <figure class="paint tall reveal"><img src="/static/landing/orrery.jpg" alt="Joseph Wright of Derby, A Philosopher Lecturing on the Orrery (c. 1766)" loading="lazy" style="object-position:55% 50%"><figcaption>Joseph Wright of Derby · The Orrery · c. 1766</figcaption></figure>
-    <div class="reveal">
-      <div class="kicker">How it works</div>
-      <h2>From a few seeds to a reading list.</h2>
-      <p class="big">You bring the papers you trust. MedicUp builds the neighbourhood around them and ranks it, so you see the whole field without losing the thread.</p>
-      <a class="btn ghost" href="/app">Try it with the example seeds</a>
+<section id="score"><div class="wrap split">
+  <div class="rv">
+    <div class="k">Transparent scoring</div>
+    <h2>Every rank is an equation you can read.</h2>
+    <p class="big">Citation structure, semantic similarity and an optional expert judge, normalised to 1–100% within each run.</p>
+  </div>
+  <div class="panel rv">
+    <div class="formula"><span class="t" data-t="g">w<sub>g</sub>·G</span> + <span class="t" data-t="s">w<sub>s</sub>·S</span> + <span class="t" data-t="l">w<sub>l</sub>·L</span></div>
+    <div class="terms">
+      <div class="term" data-t="g"><b>G · graph</b><span>direct citations + shared references with your seeds</span></div>
+      <div class="term" data-t="s"><b>S · semantic</b><span>TF-IDF cosine to your question and seeds</span></div>
+      <div class="term" data-t="l"><b>L · judge</b><span>optional LLM relevance, 0–100</span></div>
     </div>
-  </div>
-  <div class="steps">
-    <div class="step reveal"><div class="n">01</div><h3>Resolve your seeds</h3><p>DOIs, doi.org links, PMIDs or titles are matched against OpenAlex. Ambiguous titles ask you to pick.</p></div>
-    <div class="step reveal"><div class="n">02</div><h3>Expand</h3><p>References and citing works of every seed, a literature search on your question, and a Tavily scholarly-web search.</p></div>
-    <div class="step reveal"><div class="n">03</div><h3>Rank, out loud</h3><p>Graph, semantic and optional LLM-judge signals combine into a 1–100% score with adjustable weights.</p></div>
-    <div class="step reveal"><div class="n">04</div><h3>Decide &amp; export</h3><p>Accept or reject, see retraction flags, and export Markdown, BibTeX or RIS.</p></div>
-  </div>
-</div></section>
-
-<section id="explain"><div class="wrap">
-  <div class="split rev">
-    <figure class="paint tall reveal"><img src="/static/landing/airpump.jpg" alt="Joseph Wright of Derby, An Experiment on a Bird in the Air Pump (1768)" loading="lazy" style="object-position:50% 45%"><figcaption>Joseph Wright of Derby · An Experiment on a Bird in the Air Pump · 1768</figcaption></figure>
-    <div class="reveal">
-      <div class="kicker">Transparency</div>
-      <h2>Every result explains itself.</h2>
-      <p class="big">Each paper shows which seed it cites or is cited by, what it found through search or the web, and how every signal adds up to its score. Supporting web sources and a figure from the paper sit right next to it.</p>
-      <div class="feat" style="grid-template-columns:1fr 1fr">
-        <div><b>Provenance</b><span>Citation paths back to your seeds</span></div>
-        <div><b>Score breakdown</b><span>Graph · semantic · judge, re-weightable</span></div>
-        <div><b>Web context</b><span>Tavily background and supporting sources</span></div>
-        <div><b>Retraction flags</b><span>Warned before you accept</span></div>
+    <div class="gauge">
+      <svg viewBox="0 0 120 120"><defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#0a6cff"/><stop offset="1" stop-color="#13c39b"/></linearGradient></defs>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#e9edf3" stroke-width="10"/>
+        <circle id="arc" cx="60" cy="60" r="50" fill="none" stroke="url(#gg)" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 60 60)" style="transition:stroke-dasharray .9s cubic-bezier(.22,.8,.2,1)"/></svg>
+      <div style="flex:1"><div class="v" id="pct">0%</div><small>example paper · move the weights</small>
+        <div class="sl">graph<input type="range" id="wg" min="0" max="100" value="50"><span id="wgv">.50</span></div>
+        <div class="sl">semantic<input type="range" id="ws" min="0" max="100" value="35"><span id="wsv">.35</span></div>
+        <div class="sl">judge<input type="range" id="wl" min="0" max="100" value="15"><span id="wlv">.15</span></div>
       </div>
     </div>
   </div>
-  <figure class="paint wide band reveal"><img src="/static/landing/bookworm.jpg" alt="Carl Spitzweg, The Bookworm (c. 1850)" loading="lazy" style="object-position:50% 22%"><div class="over">A library belongs to everyone who walks in. MedicUp helps you find the shelf you didn’t know to look for.</div></figure>
 </div></section>
 
-<section id="evaluate"><div class="wrap">
-  <div class="split">
-    <figure class="paint tall reveal"><img src="/static/landing/astronomer.jpg" alt="Johannes Vermeer, The Astronomer (c. 1668)" loading="lazy"><figcaption>Johannes Vermeer · The Astronomer · c. 1668</figcaption></figure>
-    <div class="reveal">
-      <div class="kicker">Evaluation</div>
-      <h2>Measured on your own seeds.</h2>
-      <p class="big">MedicUp hides each seed in turn, ranks the field with the others, and records where the hidden paper lands for every channel. Recall@5, @10 and @20 come straight from that table, so you can see when the hybrid ranking beats plain keyword search.</p>
-      <a class="btn primary" href="/app">Run an evaluation →</a>
-    </div>
+<section id="method" style="background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
+  <div class="rv" style="text-align:center;max-width:720px;margin:0 auto"><div class="k">Method</div><h2>From a few seeds to the whole field.</h2></div>
+  <div class="flow">
+    <div class="st rv"><span class="n">01</span><svg viewBox="0 0 44 44" fill="none" stroke="#0a6cff" stroke-width="2"><circle cx="22" cy="22" r="6" fill="#0a6cff"/><circle cx="22" cy="22" r="14" stroke-dasharray="3 4"/></svg><h3>Seed</h3><p>DOIs, PMIDs or titles you trust.</p></div>
+    <div class="st rv" style="transition-delay:.08s"><span class="n">02</span><svg viewBox="0 0 44 44" fill="none" stroke="#0a6cff" stroke-width="2"><circle cx="22" cy="22" r="4" fill="#0a6cff"/><path d="M22 22C22 12 10 12 8 6M22 22c0-10 12-10 14-16M22 22c0 10-12 10-14 16M22 22c0 10 12 10 14 16"/></svg><h3>Expand</h3><p>Citation graph, literature and scholarly web.</p></div>
+    <div class="st rv" style="transition-delay:.16s"><span class="n">03</span><svg viewBox="0 0 44 44" fill="none" stroke="#13c39b" stroke-width="2"><path d="M6 36h32"/><rect x="9" y="22" width="6" height="14" rx="2"/><rect x="19" y="14" width="6" height="22" rx="2"/><rect x="29" y="8" width="6" height="28" rx="2"/></svg><h3>Score</h3><p>Graph · semantic · judge → 1–100%.</p></div>
+    <div class="st rv" style="transition-delay:.24s"><span class="n">04</span><svg viewBox="0 0 44 44" fill="none" stroke="#13c39b" stroke-width="2"><path d="M10 23l8 8 16-18"/></svg><h3>Decide</h3><p>Accept, flag retractions, export BibTeX/RIS.</p></div>
   </div>
 </div></section>
 
-<section class="quote reveal"><div class="wrap">
-  <div class="kicker">Our mission</div>
-  <blockquote>“Research should start from what you trust and end with what you can defend.”</blockquote>
-  <cite>MedicUp: seed-based, explainable literature discovery</cite>
+<section id="proof"><div class="wrap split">
+  <div class="panel chart rv" id="chart">
+    <svg viewBox="0 0 420 240" aria-label="Recall at k, illustrative">
+      <g stroke="#e9edf3"><line x1="40" y1="20" x2="40" y2="200"/><line x1="40" y1="200" x2="400" y2="200"/><line x1="40" y1="110" x2="400" y2="110" stroke-dasharray="3 4"/></g>
+      <g font-family="ui-monospace,monospace" font-size="11" fill="#98a1b2"><text x="40" y="218">@1</text><text x="150" y="218">@5</text><text x="270" y="218">@10</text><text x="380" y="218">@20</text><text x="8" y="24">1.0</text><text x="8" y="114">0.5</text></g>
+      <path class="ln" pathLength="1" stroke="#cfd6e2" d="M40,195 C120,185 200,165 270,150 S360,130 395,120"/>
+      <path class="ln" pathLength="1" stroke="url(#cg)" d="M40,170 C110,110 190,70 270,52 S360,38 395,34"/>
+      <defs><linearGradient id="cg" x1="0" x2="1"><stop offset="0" stop-color="#0a6cff"/><stop offset="1" stop-color="#13c39b"/></linearGradient></defs>
+      <circle class="pt" cx="395" cy="34" r="5" fill="#13c39b"/><circle class="pt" cx="395" cy="120" r="5" fill="#cfd6e2"/>
+    </svg>
+    <div class="legend"><span><i style="background:var(--grad)"></i>hybrid</span><span><i style="background:#cfd6e2"></i>keyword only</span><span style="margin-left:auto">illustrative curve</span></div>
+  </div>
+  <div class="rv">
+    <div class="k">Evaluation</div>
+    <h2>Measured on your own seeds.</h2>
+    <p class="big">Leave-one-out: hide each seed, rank with the rest, see where it lands. Recall@k for every channel, from your own data.</p>
+  </div>
 </div></section>
 
-<div class="final wrap reveal">
-  <div class="kicker">Get started</div>
-  <h2>Paste three papers. See the field.</h2>
-  <div class="term">$ <b>open</b> medicap → paste DOIs → <b>Run discovery</b></div><br>
-  <a class="btn primary" href="/app">Open the dashboard →</a>
+<section style="padding-top:0"><div class="wrap split">
+  <div class="rv">
+    <div class="k">Health × evidence</div>
+    <h2>Built for medicine.</h2>
+    <p class="big">PubMed IDs, PMC figures, retraction flags and clinical sources, with every claim traced back to a paper.</p>
+  </div>
+  <div class="panel cells rv" style="padding:0"><canvas id="cells" aria-hidden="true"></canvas></div>
+</div></section>
+
+<div class="end">
+  <canvas id="net2" aria-hidden="true"></canvas>
+  <div class="k rv" style="position:relative">Get started</div>
+  <h2 class="rv">Three papers in. The field out.</h2>
+  <a class="btn p rv" href="/app">Open the dashboard <span class="ar">→</span></a>
 </div>
 
-<footer><div class="wrap">
-  <span style="display:flex;align-items:center;gap:12px"><img src="/static/brand/medicup-logo.png" alt="MedicUp" style="height:22px">data from OpenAlex, web context from Tavily</span>
-  <span>Paintings: Rembrandt, Wright of Derby, Spitzweg and Vermeer. Public domain, via <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a>.</span>
-</div></footer>
+<footer><div class="wrap"><img src="/static/brand/medicup-logo.png" alt="MedicUp"><span>Data: OpenAlex · Web context: Tavily</span></div></footer>
 
 <script>
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.12});
-document.querySelectorAll(".reveal,.paint").forEach(el=>io.observe(el));
-const nav=document.getElementById("nav");addEventListener("scroll",()=>nav.classList.toggle("scrolled",scrollY>8),{passive:true});
+const $=s=>document.querySelector(s),still=matchMedia("(prefers-reduced-motion:reduce)").matches;
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.18});
+document.querySelectorAll(".rv,.chart").forEach(el=>io.observe(el));
+addEventListener("scroll",()=>{$("#nav").classList.toggle("s",scrollY>8);const h=document.documentElement;$("#bar").style.width=100*scrollY/(h.scrollHeight-innerHeight||1)+"%"},{passive:true});
+
+/* citation network: seeds pulse, papers drift, curved links, light pulses flow from seed to paper; cursor attracts */
+function network(cv,opts){
+  const cx=cv.getContext("2d");let W,H,dpr,nodes=[],seeds=[],pulses=[],mouse={x:-1e4,y:-1e4};
+  function size(){dpr=Math.min(devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);init()}
+  function init(){const n=Math.round(Math.min(90,W*H/14000)*(opts.density||1));nodes=[];for(let i=0;i<n;i++)nodes.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,r:1.6+Math.random()*2.4,p:Math.random()*6.28});
+    seeds=[0,1,2].map(i=>({x:W*(opts.sx||.68)+(i-1)*W*.11,y:H*.5+(i%2?-1:1)*H*.06,r:6,seed:1,p:i}));
+    seeds.forEach(s=>s.kids=nodes.map((n,i)=>i).sort(()=>Math.random()-.5).slice(0,9))}
+  function curve(a,b){const my=(a.y+b.y)/2;return [a.x,my,b.x,my]}
+  function bez(a,b,t){const [c1x,c1y,c2x,c2y]=curve(a,b),u=1-t;return {x:u*u*u*a.x+3*u*u*t*c1x+3*u*t*t*c2x+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*c1y+3*u*t*t*c2y+t*t*t*b.y}}
+  const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  function frame(ts){
+    cx.clearRect(0,0,W,H);
+    for(const n of nodes){n.x+=n.vx;n.y+=n.vy;if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;const dx=mouse.x-n.x,dy=mouse.y-n.y,d=Math.hypot(dx,dy);if(d<160){n.x+=dx*.004;n.y+=dy*.004}}
+    cx.lineWidth=1;
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],d=Math.hypot(a.x-b.x,a.y-b.y);if(d<110){cx.strokeStyle=`rgba(11,27,63,${.07*(1-d/110)})`;cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke()}}
+    for(const s of seeds){for(const k of s.kids){const b=nodes[k],[c1x,c1y,c2x,c2y]=curve(s,b);const g=cx.createLinearGradient(s.x,s.y,b.x,b.y);g.addColorStop(0,"rgba(10,108,255,.32)");g.addColorStop(1,"rgba(19,195,155,.12)");cx.strokeStyle=g;cx.lineWidth=1.2;cx.beginPath();cx.moveTo(s.x,s.y);cx.bezierCurveTo(c1x,c1y,c2x,c2y,b.x,b.y);cx.stroke()}}
+    if(!still&&Math.random()<.08){const s=seeds[Math.random()*3|0];pulses.push({s,b:nodes[s.kids[Math.random()*s.kids.length|0]],t0:ts,d:1600+Math.random()*900})}
+    pulses=pulses.filter(p=>ts-p.t0<p.d);
+    for(const p of pulses){const t=ease((ts-p.t0)/p.d),q=bez(p.s,p.b,t),gl=cx.createRadialGradient(q.x,q.y,0,q.x,q.y,10);gl.addColorStop(0,"rgba(120,190,255,.75)");gl.addColorStop(1,"rgba(120,190,255,0)");cx.fillStyle=gl;cx.beginPath();cx.arc(q.x,q.y,10,0,7);cx.fill()}
+    for(const n of nodes){n.p+=.02;cx.fillStyle=`rgba(10,108,255,${.35+.25*Math.sin(n.p)})`;cx.beginPath();cx.arc(n.x,n.y,n.r,0,7);cx.fill()}
+    for(const s of seeds){const pr=6+2*Math.sin(ts/600+s.p);cx.fillStyle="rgba(19,195,155,.16)";cx.beginPath();cx.arc(s.x,s.y,pr*2.6,0,7);cx.fill();cx.fillStyle="#0b1b3f";cx.beginPath();cx.arc(s.x,s.y,6,0,7);cx.fill()}
+    if(!still)requestAnimationFrame(frame)}
+  cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect();mouse={x:e.clientX-r.left,y:e.clientY-r.top}});
+  cv.parentElement.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect();mouse={x:e.clientX-r.left,y:e.clientY-r.top}});
+  addEventListener("resize",size);size();requestAnimationFrame(frame)}
+network($("#net"),{sx:.72});network($("#net2"),{sx:.5,density:.6});
+
+/* cell / molecule field: soft membranes drifting, hexagonal molecules rotating */
+(function(){const cv=$("#cells"),cx=cv.getContext("2d");let W,H,items=[];
+  function size(){const d=Math.min(devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*d;cv.height=H*d;cx.setTransform(d,0,0,d,0,0);
+    items=Array.from({length:14},(_,i)=>({x:Math.random()*W,y:Math.random()*H,r:i<6?26+Math.random()*30:10+Math.random()*8,hex:i>=6,a:Math.random()*6,va:(Math.random()-.5)*.006,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,ph:Math.random()*6}))}
+  function f(ts){cx.clearRect(0,0,W,H);
+    for(const o of items){o.x+=o.vx;o.y+=o.vy;o.a+=o.va;if(o.x<-40||o.x>W+40)o.vx*=-1;if(o.y<-40||o.y>H+40)o.vy*=-1;
+      if(!o.hex){cx.beginPath();for(let k=0;k<=40;k++){const t=k/40*6.283,rr=o.r*(1+.06*Math.sin(3*t+ts/900+o.ph));cx.lineTo(o.x+rr*Math.cos(t),o.y+rr*Math.sin(t))}
+        const g=cx.createRadialGradient(o.x-o.r*.3,o.y-o.r*.3,2,o.x,o.y,o.r);g.addColorStop(0,"rgba(19,195,155,.28)");g.addColorStop(1,"rgba(10,108,255,.08)");cx.fillStyle=g;cx.fill();cx.strokeStyle="rgba(10,108,255,.25)";cx.stroke();
+        cx.fillStyle="rgba(11,27,63,.35)";cx.beginPath();cx.arc(o.x+o.r*.15,o.y,o.r*.22,0,7);cx.fill()}
+      else{cx.strokeStyle="rgba(11,27,63,.45)";cx.lineWidth=1.3;cx.beginPath();for(let k=0;k<=6;k++){const t=o.a+k*Math.PI/3;cx.lineTo(o.x+o.r*Math.cos(t),o.y+o.r*Math.sin(t))}cx.stroke();
+        cx.fillStyle="#0a6cff";for(let k=0;k<6;k+=2){const t=o.a+k*Math.PI/3;cx.beginPath();cx.arc(o.x+o.r*Math.cos(t),o.y+o.r*Math.sin(t),2.4,0,7);cx.fill()}}}
+    if(!still)requestAnimationFrame(f)}
+  addEventListener("resize",size);size();requestAnimationFrame(f)})();
+
+/* interactive scoring: example paper G=.82, S=.64, L=.71 */
+(function(){const v={g:.82,s:.64,l:.71};
+  function upd(){const w={g:+$("#wg").value,s:+$("#ws").value,l:+$("#wl").value},tot=w.g+w.s+w.l||1;
+    ["g","s","l"].forEach(k=>$("#w"+k+"v").textContent=(w[k]/tot).toFixed(2).replace(/^0/,""));
+    const sc=Math.max(1,Math.round(100*(w.g*v.g+w.s*v.s+w.l*v.l)/tot));$("#pct").textContent=sc+"%";$("#arc").setAttribute("stroke-dasharray",sc+" 100")}
+  ["wg","ws","wl"].forEach(id=>$("#"+id).addEventListener("input",upd));
+  document.querySelectorAll(".term").forEach(t=>{t.addEventListener("mouseenter",()=>document.querySelectorAll(`.formula .t[data-t="${t.dataset.t}"]`).forEach(x=>x.classList.add("on")));t.addEventListener("mouseleave",()=>document.querySelectorAll(".formula .t").forEach(x=>x.classList.remove("on")))});
+  new IntersectionObserver((es,o)=>es.forEach(e=>{if(e.isIntersecting){setTimeout(upd,300);o.disconnect()}}),{threshold:.4}).observe($("#score .panel"));})();
 </script>
 </body>
 </html>
