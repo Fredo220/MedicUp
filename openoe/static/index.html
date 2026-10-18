@@ -248,16 +248,23 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
 .cbar{height:4px;border-radius:2px;background:var(--border);margin:6px 0 4px;overflow:hidden}.cbar i{display:block;height:100%;background:var(--text)}
 .kv{display:grid;grid-template-columns:200px 1fr;gap:6px 14px;font-size:13px}
 .kv div:nth-child(odd){color:var(--muted)}
-/* citation graph (Medicap design) */
-.gmap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--bg);position:relative}
+.plist{max-height:min(68vh,640px);overflow:auto;border:1px solid var(--border);border-radius:16px;padding:10px;margin-bottom:14px;background:var(--bg);scrollbar-width:thin}
+.plist .paper{margin-bottom:8px}.plist .paper:last-child{margin-bottom:0}
+.suggs{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.sugg-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:7px 12px;font-size:13px;color:var(--text);background:var(--bg);text-align:left;transition:background .15s,border-color .15s}
+.sugg-chip:hover{background:var(--hover);border-color:var(--border2)}
+.sugg-chip .i{color:var(--muted)}
+/* citation graph (Medicap design, same palette) */
+.gmap{--gacc:#2563eb;--gstrong:#c9ced6;--gerr:#c62828;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg);position:relative;margin-bottom:4px}
+[data-theme="dark"] .gmap{--gacc:#5b8cff;--gstrong:#39414c;--gerr:#f87171}
 .gmap-h{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
 .gmap-h i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
 .gmap-h b{color:var(--text);font-weight:500}
 .gmap-h .linkbtn{margin-left:auto}
 .gmap svg.graph{display:block;width:100%;height:auto}
-.gmap .edge{pointer-events:none;fill:none;stroke:var(--border2);stroke-width:.8;stroke-opacity:.45;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:gdraw 1.1s cubic-bezier(.3,.7,.3,1) forwards;transition:stroke-opacity .2s,opacity .2s}
-.gmap .edge.main{stroke-width:1.2;stroke-opacity:.8;stroke:color-mix(in srgb,var(--link) 28%,var(--border2))}
-.gmap .edge.hot{stroke:color-mix(in srgb,var(--link) 45%,var(--bg));stroke-width:1.6;stroke-opacity:.9;opacity:1;stroke-dasharray:none;stroke-dashoffset:0;animation:none}
+.gmap .edge{pointer-events:none;fill:none;stroke:var(--gstrong);stroke-width:.8;stroke-opacity:.45;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:gdraw 1.1s cubic-bezier(.3,.7,.3,1) forwards;transition:stroke-opacity .2s,opacity .2s}
+.gmap .edge.main{stroke-width:1.2;stroke-opacity:.8;stroke:color-mix(in srgb,var(--gacc) 28%,var(--gstrong))}
+.gmap .edge.hot{stroke:color-mix(in srgb,var(--gacc) 45%,var(--bg));stroke-width:1.6;stroke-opacity:.9;opacity:1;stroke-dasharray:none;stroke-dashoffset:0;animation:none}
 .gmap svg.focus .edge:not(.hot){opacity:.08}
 .gmap svg.focus .node:not(.hot){opacity:.25}
 .gmap .node{cursor:pointer;opacity:0;animation:gpop .5s cubic-bezier(.2,1.4,.4,1) forwards;transition:opacity .2s}
@@ -283,7 +290,7 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
 @keyframes gdraw{to{stroke-dashoffset:0}}
 @keyframes gpop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.gmap .edge,.gmap .node{animation:none;stroke-dashoffset:0;opacity:1}.gmap .glow{display:none}}
-.gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:8px;max-width:280px;opacity:0;transition:opacity .12s;z-index:2}
+.gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:4px;max-width:280px;opacity:0;transition:opacity .12s;z-index:2}
 /* drawer & modal */
 .drawer{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100%;background:var(--panel);border-left:1px solid var(--border2);z-index:40;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.08)}
 .drawer.open{transform:none}
@@ -486,7 +493,7 @@ function updateComposer(){
   const n=seedList().length;
   $("seedToolLbl").textContent=n?`${n} seed paper${n>1?"s":""}`:"Seed papers";
   $("seedTool").classList.toggle("on",n>0||$("seedbox").classList.contains("open"));
-  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()&&prefs.mode==="discover"?"Ask a follow-up about these papers…":prefs.mode==="discover"?"Ask a research question, or add seed papers with + (either is enough)":"How can I help you today?";
+  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()?"Ask a follow-up — kept papers become seeds for the next search…":prefs.mode==="discover"?"Ask a research question, or add seed papers with + (either is enough)":"How can I help you today?";
   $("sendBtn").disabled=busy||(!input.value.trim()&&!n);
 }
 function autosize(){input.style.height="auto";input.style.height=Math.min(input.scrollHeight,220)+"px";}
@@ -497,9 +504,8 @@ $("composer").addEventListener("submit",e=>{e.preventDefault();if(busy)return;
   const q=input.value.trim(),seeds=seedList();
   if(seeds.length)return startDiscover(q,seeds);
   if(!q)return;
-  if(hasDiscovery()&&prefs.mode==="discover")return startFollowup(q);
-  if(prefs.mode==="discover")return startDiscover(q,[]);
-  startAsk(q);
+  if(hasDiscovery())return startTurn(q);
+  startDiscover(q,[]);
 });
 function clearComposer(){input.value="";seedsEl.value="";openSeeds(false);autosize();updateComposer();}
 
@@ -563,23 +569,24 @@ function discHtml(m){
   const seeds=(d.seeds||[]).map((s,i)=>`<div class="seed"><span class="tag">S${i+1}</span><a class="t" href="${esc(s.links?.doi||s.links?.openalex||"#")}" target="_blank" rel="noopener" title="${esc(s.title)}">${esc(s.title)}</a><span class="hint" style="font-size:12px">${s.year||""}</span>${s.is_retracted?`<span class="tg bad">Retracted</span>`:""}<span class="st ok">${ic("check","sm")}</span></div>`).join("")+(d.unresolved||[]).map(s=>`<div class="seed unres"><span class="tag">?</span><span class="t">${esc(s)}</span><span class="st no">not found</span></div>`).join("");
   const errs=[...new Set((d.errors||[]).map(e=>String(e).split(":")[0]))];
   const summary=m.summary?`<div class="prose" style="margin-top:12px">${cites(md(m.summary),sortedForFU(m),m.id)}</div>`:m.summaryState==="loading"?`<div class="status" style="margin-top:12px"><span class="spin"></span> <span class="shimmer">Writing a cited summary…</span></div>`:"";
-  const tabs=[["papers","Papers",list.length],["map","Map"],["clusters","Clusters"],["web","Web sources",(d.web_context||[]).length],["trace","Trace"]];
+  if(u.tab==="map")u.tab="papers";
+  const suggs=(m.suggestions||[]).length?`<div class="section-lbl" style="margin-top:14px">Suggested follow-ups</div><div class="suggs">${m.suggestions.map(x=>`<button class="sugg-chip" data-sugg="${esc(x)}" data-mid="${m.id}">${ic("spark","sm")}${esc(x)}</button>`).join("")}</div>`:"";
+  const tabs=[["papers","Papers & graph",list.length],["clusters","Clusters"],["web","Web sources",(d.web_context||[]).length],["trace","Trace"]];
   let body="";
-  if(u.tab==="papers")body=filtersHtml(m,list.length,all.length)+(list.length?list.map(p=>paperHtml(m,p)).join(""):`<div class="hint" style="padding:12px 0">No papers match these filters.</div>`);
-  else if(u.tab==="map")body=mapHtml(m,list);
+  if(u.tab==="papers")body=filtersHtml(m,list.length,all.length)+`<div class="plist">${list.length?list.map(p=>paperHtml(m,p)).join(""):`<div class="hint" style="padding:12px 0">No papers match these filters.</div>`}</div>`+`<div class="section-lbl">Citation graph</div>`+mapHtml(m,list);
   else if(u.tab==="clusters")body=clustersHtml(m,list);
   else if(u.tab==="web")body=(d.web_context||[]).length?`<div class="hint" style="margin-bottom:8px">Background found by Tavily web search. Use it for context; rely on the papers for evidence.</div><div class="web">${d.web_context.map(w=>`<div class="webi"><div class="h">${esc(host(w.url))}</div><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join("")}</div>`:`<div class="hint">No web sources for this run.</div>`;
   else body=traceHtml(m,secs);
   return statusHtml(m,DSTAGES,`Found ${st.n_candidates??"?"} candidates, AI-checked ${st.n_judged??"?"}, showing ${all.length} · ${secs}s`)+errorNote(m)
    +(seeds?`<div class="section-lbl">Seed papers</div><div class="seeds">${seeds}</div>`:"")
    +(errs.length?`<div class="note warn">Some sources were temporarily unavailable, so results may be incomplete: ${errs.map(esc).join(", ")}</div>`:"")
-   +summary
+   +summary+suggs
    +`<div class="tabs">${tabs.map(t=>`<button class="tab${u.tab===t[0]?" on":""}" data-tab="${t[0]}" data-mid="${m.id}">${t[1]}${t[2]!=null?`<span class="c">${t[2]}</span>`:""}</button>`).join("")}</div>`
    +body
    +`<div class="msg-actions">
       ${m.summary?`<button class="ma" data-act="copy" data-mid="${m.id}" title="Copy summary">${ic("copy","sm")}</button>`:""}
       <span class="dd"><button class="ma" data-act="expmenu" data-mid="${m.id}">${ic("dl","sm")}Export</button><div class="menu">${["bib:BibTeX","ris:RIS","md:Markdown","csv:CSV"].map(x=>{const[k,l]=x.split(":");return `<button class="menu-item" data-act="exp" data-fmt="${k}" data-mid="${m.id}">${l}</button>`;}).join("")}</div></span>
-      <button class="ma" data-act="rerun" data-mid="${m.id}" ${acc||rej?"":"disabled"} title="Accepted papers become new seeds; rejected ones are excluded">${ic("redo","sm")}Re-run with feedback${acc||rej?` (+${acc} / −${rej})`:""}</button>
+      <button class="ma" data-act="rerun" data-mid="${m.id}" ${acc||rej?"":"disabled"} title="Kept papers become new seeds; rejected ones are excluded">${ic("redo","sm")}Re-run with feedback${acc||rej?` (+${acc} / −${rej})`:""}</button>
     </div>`;
 }
 function filtersHtml(m,n,tot){
@@ -619,7 +626,7 @@ function paperHtml(m,p){
    <details class="breakdown"${u.open.has("b"+id)?" open":""} data-key="b${esc(id)}" data-mid="${m.id}"><summary>${ic("right","sm")}Score breakdown</summary><div class="bd">
      ${bar("AI relevance",(c.llm_relevance??0)/10,`${c.llm_relevance??"–"}/10`)}${bar("Similarity",c.similarity??0,`${Math.round((c.similarity??0)*100)}%`)}${bar("Linked seeds",(c.seed_links??0)/nS,`${c.seed_links??0}/${nS}`)}${bar("Signals",Math.min(1,(c.n_signals??0)/3),`${c.n_signals??(p.signals||[]).length}`)}</div></details>
    <div class="pact">${links}<button class="pa" data-act="abs" data-mid="${m.id}" data-id="${esc(id)}">${ic("paper","sm")}Abstract</button><button class="pa" data-act="cite" data-mid="${m.id}" data-id="${esc(id)}">${ic("copy","sm")}Cite</button><span class="sp"></span>
-     <button class="pa${dec==="acc"?" on-acc":""}" data-act="acc" data-mid="${m.id}" data-id="${esc(id)}" title="Add to reading list and use as a seed on re-run">${ic("check","sm")}${dec==="acc"?"Accepted":"Accept"}</button>
+     <button class="pa${dec==="acc"?" on-acc":""}" data-act="acc" data-mid="${m.id}" data-id="${esc(id)}" title="Keep: added to the reading list and used as a seed for the next search">${ic("check","sm")}${dec==="acc"?"Kept":"Keep"}</button>
      <button class="pa${dec==="rej"?" on-rej":""}" data-act="rej" data-mid="${m.id}" data-id="${esc(id)}" title="Not relevant; excluded on re-run">${ic("x","sm")}${dec==="rej"?"Rejected":"Reject"}</button></div>
    <div class="abstract${u.open.has("a"+id)?" open":""}">${p.abstract?hlQuote(p.abstract,p.quote_verified?p.quote:""):"No abstract available."}</div></div>`;
 }
@@ -662,10 +669,10 @@ function mapHtml(m,list){
       <text class="${k.startsWith("S")?"sl":"rk"}" x="${x}" y="${ly}">${label}</text></g></g>`};
   row.forEach((s,i)=>{const[x,y]=pos["S"+i];h+=node("S"+i,s.q?"":s.openalex_id,x,y,10,"var(--text)",s.q?"Question":"Seed "+(i+1),i%2===0,true,(.05*i).toFixed(2),`data-s="${i}"`)});
   shown.forEach((p,i)=>{const[x,y]=pos[p.openalex_id],dec=m.dec[p.openalex_id],rk=p._rank;
-    const col=p.is_retracted?"var(--bad)":dec==="acc"?"var(--ok)":"var(--link)";
+    const col=p.is_retracted?"var(--gerr)":dec==="acc"?"var(--ok)":"var(--gacc)";
     h+=node(p.openalex_id,p.openalex_id,x,y,5+(p._pct/100)*4,col,"Rank "+rk,y<mid,rk<=10,(.35+i*.035).toFixed(2),`data-p="${esc(p.openalex_id)}"${dec==="rej"?' style="opacity:.3"':""}`)});
   setTimeout(()=>{const g=document.querySelector(`.gmap[data-map="${m.id}"]`);if(g){paintFigures(g);loadFigures(m,shown,g);}},0);
-  return `<div class="gmap" data-map="${m.id}"><div class="gmap-h"><span><i style="background:var(--text)"></i><b>${q?"Question":"Seed N"}</b> = ${q?"your research question":"a paper you provided"} (middle row)</span><span><i style="background:var(--link)"></i><b>Rank N</b> = position in the ranked list</span><span><i style="background:var(--bad)"></i>flagged</span><span>dot size = score · branches = ${q?"relevance":"citation"} links · hover a dot to bring its chain and figures into focus</span><button class="linkbtn" data-replay="${m.id}">Replay</button></div><svg class="graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="Citation graph of seeds and candidates">${h}</svg><div class="gtip"></div></div>`;
+  return `<div class="gmap" data-map="${m.id}"><div class="gmap-h"><span><i style="background:var(--text)"></i><b>${q?"Question":"Seed N"}</b> = ${q?"your research question":"a paper you provided"} (middle row)</span><span><i style="background:var(--gacc)"></i><b>Rank N</b> = position in the ranked list</span><span><i style="background:var(--gerr)"></i>flagged</span><span>dot size = score · branches = ${q?"relevance":"citation"} links · hover a dot to bring its chain and figures into focus</span><button class="linkbtn" data-replay="${m.id}">Replay</button></div><svg class="graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="Citation graph of seeds and candidates">${h}</svg><div class="gtip"></div></div>`;
 }
 async function loadFigures(m,shown,g){
   const want=[...(m.data.seeds||[]).map(s=>({id:s.openalex_id,t:s.title,doi:s.doi||"",pmid:s.pmid||""})),...shown.map(p=>({id:p.openalex_id,t:p.title,doi:p.doi||"",pmid:p.pmid||""}))].filter(p=>p.id&&!(p.id in FIG)&&!FIGREQ.has(p.id));
@@ -763,6 +770,7 @@ $("thread").addEventListener("click",e=>{
     const m=discById(cite.dataset.mid);if(!m)return;const p=sortedForFU(m)[+cite.dataset.n-1];if(p)gotoPaper(m,p.openalex_id);return;}
   const go=t.closest("[data-goto]");if(go){e.preventDefault();gotoPaper(discById(go.dataset.mid),go.dataset.goto);return;}
   const gn=t.closest(".gmap .node[data-p]");if(gn){gotoPaper(discById(gn.closest(".gmap").dataset.map),gn.dataset.p);return;}
+  const sg=t.closest("[data-sugg]");if(sg){if(busy)return;startTurn(sg.dataset.sugg);return;}
   const rp=t.closest("[data-replay]");if(rp){const m=discById(rp.dataset.replay);U(m).mapShown=false;rerender(m);return;}
   const b=t.closest("[data-act]");if(!b)return;const m=discById(b.dataset.mid);const id=b.dataset.id;
   switch(b.dataset.act){
@@ -786,17 +794,17 @@ function gotoPaper(m,id){if(!m)return;const u=U(m);let need=u.tab!=="papers";if(
 
 /* ---------- runs ---------- */
 function setBusy(b){busy=b;updateComposer();}
-function startDiscover(q,seeds,disliked){
+function startDiscover(q,seeds,disliked,hist){
   const c=ensureChat(q||"Discover: "+seeds[0]);
   c.msgs.push({id:uid(),role:"user",text:q,seeds});
-  const m={id:uid(),role:"assistant",kind:"discover",status:"running",stage:"seeds",msgs:{},req:{question:q,seeds,disliked:disliked||[],limit:prefs.limit},data:null,dec:{}};
+  const m={id:uid(),role:"assistant",kind:"discover",status:"running",stage:"seeds",msgs:{},req:{question:q,seeds,disliked:disliked||[],limit:prefs.limit},hist:hist||[],data:null,dec:{}};
   c.msgs.push(m);clearComposer();save();renderAll();scrollEnd();setBusy(true);
   let done=false;
   const fail=msg=>{if(done)return;done=true;m.status="error";m.error="Discovery failed: "+msg;save();rerender(m);setBusy(false);};
   const finish=d=>{if(done)return;done=true;m.status="done";m.data=d;m.stage="done";
     if(!(d.results||[]).length){save();rerender(m);setBusy(false);return;}
-    if(q){m.summaryState="loading";rerender(m);followup(q,[],sortedForFU(m)).then(a=>{m.summary=a;}).catch(()=>{}).finally(()=>{m.summaryState="";save();rerender(m);setBusy(false);});}
-    else{save();rerender(m);setBusy(false);}
+    const sq=q||"Summarise what these papers show and how they relate to the seed papers.";
+    m.summaryState="loading";rerender(m);followup(sq,m.hist||[],sortedForFU(m)).then(d=>{m.summary=d.answer||"";m.suggestions=d.suggestions||[];}).catch(()=>{}).finally(()=>{m.summaryState="";save();rerender(m);setBusy(false);});
     save();rerender(m);};
   const post=()=>fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(m.req)}).then(r=>r.ok?r.json():r.text().then(t=>{throw new Error(`HTTP ${r.status} ${t.slice(0,160)}`);})).then(finish).catch(e=>fail(e.message));
   let ws,opened=false;try{ws=new WebSocket(wsUrl("/ws/discover"));}catch(_){return post();}
@@ -814,7 +822,13 @@ function rerun(m){
 }
 function followup(q,history,papers){
   const ps=papers.map(p=>({openalex_id:p.openalex_id,title:p.title,year:p.year,abstract:p.abstract,links:p.links,venue:p.venue,authors:p.authors}));
-  return fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history,papers:ps})}).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(d=>d.answer||"");
+  return fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history,papers:ps})}).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();});
+}
+function startTurn(q){
+  const c=chat(),src=lastDisc();if(!src)return startDiscover(q,[]);
+  const hist=[];c.msgs.forEach(x=>{if(x.kind==="discover"&&x.summary)hist.push({role:"user",content:x.req.question||"Find papers related to my seed papers."},{role:"assistant",content:x.summary.slice(0,4000)});});
+  const acc=Object.keys(src.dec).filter(k=>src.dec[k]==="acc"),rej=Object.keys(src.dec).filter(k=>src.dec[k]==="rej");
+  startDiscover(q,[...new Set([...src.req.seeds,...acc])],[...new Set([...(src.req.disliked||[]),...rej])],hist.slice(-6));
 }
 function startFollowup(q){
   const c=chat(),src=lastDisc();

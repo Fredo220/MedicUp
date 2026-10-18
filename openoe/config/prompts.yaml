@@ -201,3 +201,17 @@ discovery_followup: |
 
   Numbered papers:
   {papers}
+
+discovery_suggestions: |
+  You are helping a clinician explore the medical literature.
+  Given the research question, the answer that was just written, and the paper titles, propose 3 short follow-up questions the clinician would most likely ask next (e.g. about subgroups, safety, comparators, dosing, long-term outcomes, guidelines, or gaps in the evidence).
+  Each question must be specific, under 14 words, and answerable by searching the literature. Output a JSON list of 3 strings only, with no surrounding prose.
+
+  Research question:
+  {question}
+
+  Answer:
+  {answer}
+
+  Paper titles:
+  {titles}
