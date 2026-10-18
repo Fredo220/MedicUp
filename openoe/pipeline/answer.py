@@ -16,6 +16,7 @@ from openoe.llm.prompts import PromptManager
 from openoe.utils.text import truncate
 
 log = logging.getLogger(__name__)
+_BARE_NUMERIC_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +59,7 @@ async def generate_answer(
 
     answer = _fix_chinese_citations(result.content.strip())
     answer = _remove_trailing_references(answer)
+    answer = _BARE_NUMERIC_CITATION_RE.sub("", answer)
     cited_ids = _extract_cited_ids(answer)
     log.info("Stage 5 cited_ids=%s from %d sources", cited_ids, len(sources))
     answer, cited = _reindex(answer, sources, cited_ids)
@@ -186,9 +188,9 @@ _BADGE_COLORS = {1: "brightgreen", 2: "green", 3: "yellow", 4: "orange", 5: "red
 
 
 def _format_markdown(question: str, answer: str, cited: List[Dict]) -> str:
-    md = [f"## 🤖回答:\n\n{answer}\n\n---\n\n"]
+    md = [f"## Answer\n\n{answer}\n\n---\n\n"]
     if cited:
-        md.append("## 🔗参考文献\n\n")
+        md.append("## References\n\n")
         for i, s in enumerate(cited, 1):
             if s.get("doc_type") == "guideline":
                 md.append(_fmt_guideline(i, s))
@@ -245,7 +247,7 @@ def _fmt_guideline(i: int, s: Dict) -> str:
     n = len(s.get("relevant_chunks", []))
     badge = "![Guideline](https://img.shields.io/badge/Guideline-red)"
     score = f" · Score {s['score_pct']}%" if s.get("score_pct") else ""
-    return f"#### ^{i}: {title}\n\n临床指南{badge}，相关段落：{n}{score}\n\n"
+    return f"#### ^{i}: {title}\n\nClinical guideline {badge}, relevant passages: {n}{score}\n\n"
 
 
 def _fmt_web(i: int, s: Dict) -> str:

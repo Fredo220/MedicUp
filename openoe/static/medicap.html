@@ -5,6 +5,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MedicUp · dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <style>
 :root{
   --bg:#f6f7f9;--surface:#fff;--sunken:#f0f2f5;--border:#e1e4e8;--border-strong:#c9ced6;
@@ -244,6 +246,38 @@ pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);bord
 .sup{margin:4px 0 0;padding-left:18px;font-size:12px}.sup li{margin:2px 0}.sup a{color:var(--accent)}
 footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);color:var(--faint);font:11px var(--mono)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* chat (from MedicUp chat UI) */
+.chatwrap{display:flex;flex-direction:column;height:calc(100vh - 330px);min-height:460px}
+.chat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.chat-head .grow{flex:1}
+.thread{flex:1;overflow-y:auto;padding:6px 2px 18px}
+.chat-empty{max-width:560px;margin:40px auto;text-align:center;color:var(--muted)}
+.chat-empty h3{color:var(--text);font-weight:600;font-size:20px;margin:0 0 6px}
+.sugg{display:flex;flex-direction:column;gap:6px;margin-top:18px;text-align:left}
+.sugg button{all:unset;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:13.5px}
+.sugg button:hover{border-color:var(--accent)}
+.umsg{display:flex;justify-content:flex-end;margin:14px 0}
+.ububble{background:var(--sunken);border:1px solid var(--border);padding:9px 14px;border-radius:16px 16px 4px 16px;max-width:78%;white-space:pre-wrap}
+.amsg{display:flex;gap:10px;margin:14px 0}
+.amsg .av{flex:none;width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid var(--border);display:grid;place-items:center}
+.amsg .av img{width:18px}
+.abody{flex:1;min-width:0}
+.aname{font-size:12.5px;font-weight:600;margin-bottom:4px}.aname small{font-weight:400;color:var(--faint);margin-left:6px}
+.prose{font-size:14.5px;line-height:1.65}.prose p{margin:.5em 0}.prose ul,.prose ol{padding-left:1.3em}.prose h2,.prose h3,.prose h4{font-size:15px;margin:1em 0 .3em}
+.prose table{border-collapse:collapse;font-size:13px}.prose td,.prose th{border:1px solid var(--border);padding:4px 8px}
+sup.cite{cursor:pointer;color:var(--accent);font-weight:600;font-size:10.5px;padding:0 2px}
+.srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.srcs a,.srcs button{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;max-width:340px;font-size:12px;border:1px solid var(--border);border-radius:999px;padding:3px 10px 3px 4px;background:var(--surface);color:var(--text)}
+.srcs .n{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:50%;background:var(--sunken);font:600 10.5px var(--mono,ui-monospace)}
+.srcs span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thinking{color:var(--muted);font-size:13.5px}.thinking i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.composer{border:1px solid var(--border-strong);border-radius:18px;background:var(--surface);padding:8px 8px 8px 14px;display:flex;align-items:flex-end;gap:8px}
+.composer textarea{flex:1;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;font-size:14.5px;max-height:160px;padding:6px 0}
+.composer .send{flex:none;width:34px;height:34px;border-radius:50%;border:0;background:var(--text);color:var(--surface);cursor:pointer;display:grid;place-items:center}
+.composer .send:disabled{opacity:.35;cursor:default}
+.chat-note{font-size:12px;color:var(--faint);margin-top:6px;text-align:center}
+.chat-warn{border:1px solid var(--border);background:var(--sunken);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--muted);margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -306,6 +340,7 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding
       <button class="tab" role="tab" aria-selected="false" data-tab="clusters">Clusters <span class="count" id="nCl">0</span></button>
       <button class="tab" role="tab" aria-selected="false" data-tab="eval">Evaluation</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="export">Reading list <span class="count" id="nAcc">0</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="chat">Ask MedicUp</button>
     </div>
 
     <div class="panel" id="p-ranked">
@@ -368,10 +403,24 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding
         </div>
       </div>
     </div>
+    <div class="panel" id="p-chat" hidden>
+      <div class="chatwrap">
+        <div class="chat-head">
+          <div class="seg" id="cmode"><button data-m="papers" class="on a">About these papers</button><button data-m="lit">Whole literature</button></div>
+          <span class="faint" id="cscope" style="font-size:12.5px"></span><span class="grow"></span>
+          <button class="iconbtn" id="cclear" type="button">New chat</button>
+          <a class="iconbtn" href="/chat" title="Full-screen chat with saved conversations">Open full chat ↗</a>
+        </div>
+        <div class="chat-warn" id="cwarn" hidden></div>
+        <div class="thread" id="thread"></div>
+        <div class="composer"><textarea id="cin" rows="1" placeholder="Ask about the ranked papers…"></textarea><button class="send" id="csend" type="button" aria-label="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+        <div class="chat-note" id="cnote">Answers cite only the papers in this run · click a number to open the paper</div>
+      </div>
+    </div>
   </main>
 </div>
 
-<footer><span>Each result links back to the seeds and sources that produced it</span><span>backend: MedicUp (FastAPI) · data: OpenAlex · web: Tavily · judge: OpenRouter LLM (optional)</span></footer>
+<footer><span>Each result links back to the seeds and sources that produced it</span><span>backend: MedicUp (FastAPI) · data: OpenAlex · web: Tavily · LLM: Nebius Token Factory</span></footer>
 
 <script>
 /* Mock lookup index standing in for openalex / crossref / pubmed. */
@@ -459,7 +508,7 @@ $("#seedInput").addEventListener("input",()=>{clearTimeout(seedTimer);seedTimer=
 $("#seedInput").value=DEFAULT_SEEDS;
 
 /* weights */
-function syncW(){const t=st.w.g+st.w.s+(JUDGE?st.w.l:0)||1;["g","s","l"].forEach(k=>{$("#w"+k.toUpperCase()+"v").textContent=k==="l"&&!JUDGE?"off":pct(st.w[k]/t)});$("#wL").disabled=!JUDGE;$("#wL").title=JUDGE?"":"LLM judge needs OPENROUTER_API_KEY on the server"}
+function syncW(){const t=st.w.g+st.w.s+(JUDGE?st.w.l:0)||1;["g","s","l"].forEach(k=>{$("#w"+k.toUpperCase()+"v").textContent=k==="l"&&!JUDGE?"off":pct(st.w[k]/t)});$("#wL").disabled=!JUDGE;$("#wL").title=JUDGE?"":"LLM judge needs NEBIUS_API_KEY on the server"}
 let wTimer;
 ["g","s","l"].forEach(k=>$("#w"+k.toUpperCase()).addEventListener("input",e=>{
   if(!st.prevW){st.prevW={...st.w};st.prevOrder=ranked(st.w)}
@@ -510,7 +559,7 @@ function trace(p){
     if(c==="web")out.push(`  - web: tavily scholarly search, rank #${p.web_rank}`);
   });
   (p.web||[]).forEach(w=>out.push(`      ↳ <span class="ts">"${esc(w.title)}"</span> <span class="tc">${esc(w.domain)} · ${w.score_pct}%</span>`));
-  out.push(`<span class="tk">judge</span>: ${useL(p)?`<span class="tn">${pct(p.l)}</span>  <span class="tc"># llm relevance, abstract + seed titles</span>`:`off  <span class="tc"># ${JUDGE?"not judged":"no OPENROUTER_API_KEY on server"}</span>`}`);
+  out.push(`<span class="tk">judge</span>: ${useL(p)?`<span class="tn">${pct(p.l)}</span>  <span class="tc"># llm relevance, abstract + seed titles</span>`:`off  <span class="tc"># ${JUDGE?"not judged":"no NEBIUS_API_KEY on server"}</span>`}`);
   if(p.flag)out.push(`<span class="tk">flags</span>: [<span class="ts">"${esc(p.flag)}"</span>]  <span class="tc"># openalex is_retracted</span>`);
   out.push(`<span class="tk">score</span>: <span class="tn">${pct(score(p)/T)}</span> of best = ${pct(st.w.g/t)}·g + ${pct(st.w.s/t)}·s${useL(p)?` + ${pct(st.w.l/t)}·l`:""}`);
   return out.join("\n");
@@ -772,6 +821,80 @@ try{const t=localStorage.getItem("pc-theme");if(t)document.documentElement.datas
 function renderAll(){renderRows();renderClusters();renderExport();if(st.tab==="graph")renderGraph(false)}
 syncW();renderStages();renderAll();renderEval();parseSeeds();
 api("/api/medicap/status").then(s=>{JUDGE=s.judge;TAVILY=s.tavily;syncW()}).catch(()=>{});
+
+/* ---------- Ask MedicUp: chat grounded on this run (/api/followup) or the whole literature (/api/query) ---------- */
+const CHAT={mode:"papers",msgs:[],busy:false,llm:null};
+const mdh=s=>{const h=window.marked?marked.parse(s||""):esc(s||"");return window.DOMPurify?DOMPurify.sanitize(h):h};
+const chatPapers=()=>P.filter(p=>!p.id.startsWith("web:")&&st.dec[p.id]!=="r").slice(0,25);
+const paperLink=p=>p.doi?"https://doi.org/"+p.doi:(p.url||"");
+fetch("/api/medicap/status").then(r=>r.json()).then(s=>{CHAT.llm=!!s.llm;renderChat()}).catch(()=>{});
+function chatScope(){
+  if(CHAT.mode==="lit")return "cited answer from OpenAlex + Tavily";
+  const n=chatPapers().length;return n?`grounded on the top ${n} ranked papers`:"run discovery first";
+}
+function renderChat(){
+  $$("#cmode button").forEach(b=>{const on=b.dataset.m===CHAT.mode;b.classList.toggle("on",on);b.classList.toggle("a",on)});
+  $("#cscope").textContent=chatScope();
+  const warn=CHAT.llm===false?"Chat needs an LLM: set <code>NEBIUS_API_KEY</code> in the server's <code>.env</code> and restart.":(CHAT.mode==="papers"&&!chatPapers().length?"Run discovery first — answers are grounded on the ranked papers.":"");
+  $("#cwarn").hidden=!warn;$("#cwarn").innerHTML=warn;
+  $("#cin").placeholder=CHAT.mode==="papers"?"Ask about the ranked papers…":"Ask a clinical or research question…";
+  $("#cnote").textContent=CHAT.mode==="papers"?"Answers cite only the papers in this run · click a number to open the paper":"Cited answer from the literature · web sources rank below papers";
+  $("#csend").disabled=CHAT.busy;
+  const th=$("#thread");
+  if(!CHAT.msgs.length){
+    const q=($("#qInput")||{}).value||"";
+    const s=CHAT.mode==="papers"?["Summarise the main findings across the top papers.","Which papers disagree with each other, and why?","What study designs support the strongest conclusions?"]:[q||"What mechanisms make CAR-T therapy fail in solid tumors?","What are the latest strategies to overcome T-cell exhaustion?"];
+    th.innerHTML=`<div class="chat-empty"><h3>${CHAT.mode==="papers"?"Ask about this run":"Ask the literature"}</h3><div>${CHAT.mode==="papers"?"Every claim is cited to a ranked paper.":"A cited answer from OpenAlex, with web context from Tavily."}</div><div class="sugg">${s.map(x=>`<button type="button" data-sq="${esc(x)}">${esc(x)}</button>`).join("")}</div></div>`;
+    return;
+  }
+  th.innerHTML=CHAT.msgs.map(m=>{
+    if(m.role==="user")return `<div class="umsg"><div class="ububble">${esc(m.text)}</div></div>`;
+    const head=`<div class="aname">MedicUp<small>${m.kind==="lit"?"Literature":"This run"}</small></div>`;
+    if(m.status==="running")return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="thinking"><i></i>${m.kind==="lit"?"Searching the literature…":"Reading the papers…"}</div></div></div>`;
+    if(m.status==="error")return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="chat-warn">${esc(m.error)}</div></div></div>`;
+    const body=mdh(m.answer).replace(/\[\^(\d+)\]/g,(_,n)=>{const c=m.refs[+n-1];return `<sup class="cite" data-ci="${m.id}" data-n="${n}" title="${c?esc(c.title):""}">${n}</sup>`});
+    const used=[...new Set([...(m.answer||"").matchAll(/\[\^(\d+)\]/g)].map(x=>+x[1]))].sort((a,b)=>a-b).filter(n=>m.refs[n-1]);
+    const srcs=used.map(n=>{const c=m.refs[n-1];return c.pid?`<button type="button" data-goto="${esc(c.pid)}" title="${esc(c.title)}"><span class="n">${n}</span><span>${esc(c.title)}</span></button>`:`<a href="${esc(c.url||"#")}" target="_blank" rel="noopener" title="${esc(c.title)}"><span class="n">${n}</span><span>${esc(c.title)}</span></a>`}).join("");
+    return `<div class="amsg"><div class="av"><img src="/static/brand/medicup-mark.png" alt=""></div><div class="abody">${head}<div class="prose">${body}</div>${srcs?`<div class="srcs">${srcs}</div>`:""}</div></div>`;
+  }).join("");
+  th.scrollTop=th.scrollHeight;
+}
+function gotoPaper(pid){if(!P.find(p=>p.id===pid))return;st.open.add(pid);$('.tab[data-tab="ranked"]').click();renderRows();setTimeout(()=>{const r=document.querySelector(`tr[data-id="${CSS.escape(pid)}"]`);r&&r.scrollIntoView({block:"center",behavior:"smooth"})},60)}
+async function sendChat(text){
+  text=(text||"").trim();if(!text||CHAT.busy)return;
+  const kind=CHAT.mode,hist=[];
+  CHAT.msgs.forEach((m,i)=>{if(m.role==="assistant"&&m.kind===kind&&m.answer){hist.push({role:"user",content:CHAT.msgs[i-1].text},{role:"assistant",content:m.answer.slice(0,4000)})}});
+  const m={id:"c"+Date.now(),role:"assistant",kind,status:"running",answer:"",refs:[]};
+  CHAT.msgs.push({role:"user",text},m);CHAT.busy=true;$("#cin").value="";renderChat();
+  try{
+    if(kind==="papers"){
+      const ps=chatPapers();if(!ps.length)throw new Error("Run discovery first: answers are grounded on the ranked papers.");
+      const body={question:text,history:hist,papers:ps.map((p,i)=>({n:i+1,openalex_id:p.id,title:p.t,year:p.y,abstract:p.abstract||"",venue:p.v,links:{doi:p.doi?"https://doi.org/"+p.doi:null,openalex:p.url||null}}))};
+      const r=await fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if(!r.ok)throw new Error(r.status===500&&CHAT.llm===false?"No LLM configured on the server (NEBIUS_API_KEY).":"Follow-up failed (HTTP "+r.status+").");
+      const d=await r.json();m.answer=d.answer||"";m.refs=ps.map(p=>({pid:p.id,title:p.t,url:paperLink(p)}));
+    }else{
+      const r=await fetch("/api/query",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,history:hist})});
+      if(!r.ok)throw new Error("Search failed (HTTP "+r.status+").");
+      const d=await r.json();m.answer=d.answer||"";
+      m.refs=(d.citations||[]).map(c=>{const id=c.openalex_id||c.id||"",inRun=P.find(p=>p.id===id||(c.doi&&p.doi&&String(c.doi).toLowerCase().endsWith(p.doi.toLowerCase())));return {pid:inRun?inRun.id:null,title:c.title||"Untitled",url:c.url||(c.doi?(String(c.doi).startsWith("http")?c.doi:"https://doi.org/"+c.doi):"")}});
+    }
+    m.status="done";
+  }catch(e){m.status="error";m.error=e.message}
+  CHAT.busy=false;renderChat();
+}
+$("#cmode").onclick=e=>{const b=e.target.closest("button[data-m]");if(!b)return;CHAT.mode=b.dataset.m;renderChat()};
+$("#csend").onclick=()=>sendChat($("#cin").value);
+$("#cin").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat($("#cin").value)}});
+$("#cin").addEventListener("input",e=>{e.target.style.height="auto";e.target.style.height=Math.min(160,e.target.scrollHeight)+"px"});
+$("#cclear").onclick=()=>{CHAT.msgs=[];renderChat()};
+$("#thread").addEventListener("click",e=>{
+  const sq=e.target.closest("[data-sq]");if(sq)return sendChat(sq.dataset.sq);
+  const g=e.target.closest("[data-goto]");if(g)return gotoPaper(g.dataset.goto);
+  const c=e.target.closest("sup.cite");if(c){const m=CHAT.msgs.find(x=>x.id===c.dataset.ci),r=m&&m.refs[+c.dataset.n-1];if(r){r.pid?gotoPaper(r.pid):r.url&&open(r.url,"_blank","noopener")}}
+});
+$('.tab[data-tab="chat"]').addEventListener("click",()=>{renderChat();setTimeout(()=>$("#cin").focus(),0)});
+renderChat();
 </script>
 </body>
 </html>

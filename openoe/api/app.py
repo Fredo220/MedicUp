@@ -8,13 +8,16 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from openoe.core.config import load_config, validate_config, apply_overrides
 from openoe.core.models import QueryRequest, QueryResponse
+from openoe.discovery.followup import answer_followup
+from openoe.discovery.models import DiscoverRequest, DiscoverResponse, FollowupRequest
+from openoe.discovery.service import discover
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
 from openoe.medicap import discover as medicap
@@ -53,7 +56,7 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     cfg = load_config(config_path)
     validate_config(cfg)
 
-    app = FastAPI(title="Open OE", version="0.2.0", description="开源医学 RAG 问答系统")
+    app = FastAPI(title="MedicUp", version="0.2.0", description="Evidence-based medical literature search engine")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     prompts = PromptManager()
@@ -65,6 +68,8 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     app.state.config = cfg
     app.state.orchestrator = orch
+    app.state.llm = llm
+    app.state.prompts = prompts
 
     # ── Routes ────────────────────────────────────────────────
 
@@ -85,6 +90,28 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def search(req: QueryRequest):
         resp = await orch.run(req)
         return {"citations": resp.citations, "stats": resp.stats, "trace_id": resp.trace_id, "timings": resp.timings}
+
+    @app.post("/api/discover", response_model=DiscoverResponse, tags=["discovery"])
+    async def discover_papers(req: DiscoverRequest):
+        return await discover(
+            req,
+            llm=llm,
+            prompts=prompts,
+            cfg=cfg.get("discovery", {}),
+        )
+
+    @app.post("/api/followup", tags=["discovery"])
+    async def followup(req: FollowupRequest):
+        if not medicap.llm_available(app.state.config):
+            raise HTTPException(status_code=503, detail="No LLM configured: set NEBIUS_API_KEY in .env and restart.")
+        return await answer_followup(
+            llm=llm,
+            prompts=prompts,
+            cfg=cfg.get("discovery", {}),
+            question=req.question,
+            history=req.history,
+            papers=req.papers,
+        )
 
     @app.get("/api/sources", tags=["rag"])
     async def sources():
@@ -142,6 +169,7 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def medicap_status():
         c = app.state.config
         return {"judge": medicap.llm_available(c),
+                "llm": medicap.llm_available(c),
                 "tavily": bool((c.get("stages", {}).get("web_context", {}) or {}).get("api_key"))}
 
     # ── WebSocket: real-time progress ─────────────────────────
@@ -175,6 +203,41 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
             except Exception:
                 pass
 
+    @app.websocket("/ws/discover")
+    async def ws_discover(ws: WebSocket):
+        await ws.accept()
+        try:
+            raw = await ws.receive_text()
+            req = DiscoverRequest(**json.loads(raw))
+
+            async def send_progress(stage: str, message: str, detail: Dict[str, Any]) -> None:
+                try:
+                    await ws.send_json({"type": "progress", "stage": stage, "message": message, "data": detail})
+                except Exception:
+                    pass
+
+            response = await discover(
+                req,
+                progress=send_progress,
+                llm=llm,
+                prompts=prompts,
+                cfg=cfg.get("discovery", {}),
+            )
+            await ws.send_json({"type": "result", "data": response})
+        except WebSocketDisconnect:
+            log.info("Discovery WebSocket client disconnected")
+        except Exception as e:
+            log.error("Discovery WebSocket error: %s", e)
+            try:
+                await ws.send_json({"type": "error", "message": str(e)})
+            except Exception:
+                pass
+        finally:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
     # ── Frontend ──────────────────────────────────────────────
     @app.get("/", include_in_schema=False)
     async def landing():
@@ -185,6 +248,7 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def medicap_ui():
         return FileResponse(_STATIC_DIR / "medicap.html", media_type="text/html")
 
+    @app.get("/chat", include_in_schema=False)
     @app.get("/qa", include_in_schema=False)
     async def index():
         return FileResponse(_STATIC_DIR / "index.html", media_type="text/html")

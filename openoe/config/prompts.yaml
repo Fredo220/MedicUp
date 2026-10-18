@@ -1,229 +1,203 @@
 medical_expert: |
-  你是一个基于循证医学的专业医疗问答助手。
-  你必须仅基于提供的检索上下文回答，不要编造未提供的证据。
-  回答时优先采用高质量证据，指出证据局限，并使用专业中文。
+  You are an evidence-based medical research assistant.
+  Answer ONLY from the retrieved context provided; never invent evidence that is not there.
+  Prefer high-quality evidence, state the limits of the evidence, and write in clear professional English.
 
 keyword_extraction: |
-  你是一名医学文献检索专家。请根据用户问题和以下增强信息，生成最优的英文学术检索式。
+  You are a medical literature search expert. Using the user question and the extra context below, write the best English academic search query.
 
-  目标：生成一条适合 OpenAlex 学术搜索引擎的检索式，最大化召回与问题直接相关的高质量论文。
+  Goal: one query for the OpenAlex search engine that maximises recall of high-quality papers directly relevant to the question.
 
-  策略：
-  1. 提取核心概念：疾病/症状、干预/药物、比较对象、结局指标、人群特征
-  2. 使用标准英文医学术语（如药物通用名、疾病英文名）
-  3. 关键概念之间用空格分隔（OpenAlex 默认 AND 语义）
-  4. 对于核心药物/疾病，加入常见同义词或缩写以提高召回
+  Strategy:
+  1. Extract the core concepts: disease/condition, intervention/drug, comparator, outcome, population
+  2. Use standard English medical terms (generic drug names, standard disease names)
+  3. Separate concepts with spaces (OpenAlex treats spaces as AND)
+  4. For the core drug/disease, add a common synonym or abbreviation if it helps recall
 
-  输出要求：
-  - 仅输出一行英文检索式，不要任何解释
-  - 不要用 Boolean 操作符（AND/OR），直接用空格分隔关键词
-  - 不要使用 MeSH 术语格式，使用自然英文词组
-  - 最多 {max_keywords} 个关键词/短语
+  Output rules:
+  - Output ONE line of English search terms only, no explanation
+  - No Boolean operators (AND/OR), just space-separated terms
+  - No MeSH syntax, use natural English phrases
+  - At most {max_keywords} terms/phrases
 
-  用户问题：
+  User question:
   {question}
 
-  HyDE 参考文本（如有）：
+  HyDE reference text (if any):
   {hyde_text}
 
-  英文翻译（如有）：
+  English rewrite (if any):
   {translated}
 
 generate_hyde: |
   You are a medical literature search assistant.
-  Generate a short paragraph (100-150 words, in ENGLISH) that might appear as an abstract in a high-quality medical research paper answering the question below.
-  The goal is NOT to answer the user directly, but to produce text optimized for semantic literature retrieval.
+  Write a short paragraph (100-150 words, in ENGLISH) that could appear as the abstract of a high-quality medical research paper answering the question below.
+  The goal is NOT to answer the user directly, but to produce text optimised for semantic literature retrieval.
 
   Requirements:
-  1. Write in ENGLISH only — do NOT use Chinese or any other language
-  2. Use professional medical terminology (drug generic names, standard disease terms)
-  3. Cover: disease/condition, intervention, comparator, key outcomes, target population
-  4. Be concise and factual, no disclaimers or hedging
-  5. Output ONLY the paragraph text, nothing else
+  1. English only
+  2. Use professional medical terminology (generic drug names, standard disease terms)
+  3. Cover: condition, intervention, comparator, key outcomes, target population
+  4. Concise and factual, no disclaimers or hedging
+  5. Output ONLY the paragraph text
 
   Question:
   {question}
 
 translate_to_search_english: |
-  你是一名医学检索改写助手。请将下面问题改写成适合学术文献检索的英文表达。
+  You are a medical search rewriting assistant. Rewrite the question below as an English expression suited to academic literature search.
 
-  要求：
-  1. 保留疾病、治疗、比较对象、人群和结局信息
-  2. 使用医学英文术语（药物通用名、疾病标准英文名）
-  3. 输出单行英文检索表达
-  4. 不要输出解释或多余文字
+  Requirements:
+  1. Keep the disease, treatment, comparator, population and outcome information
+  2. Use English medical terminology (generic drug names, standard disease names)
+  3. Output a single line
+  4. No explanation or extra text
 
-  原问题：
+  Question:
   {question}
 
 safety_guard: |
-  你是一个医疗 RAG 系统中的安全检查模块。
+  You are the safety-check module of a medical literature search engine.
 
-  你的任务是：在问题进入医学问答引擎前，判断提问是否属于医学相关内容，以及是否存在不当、危险或明显越界的请求。
+  Decide whether the question is medical / biomedical-research related, and whether it is inappropriate or dangerous.
 
-  判断规则：
-  1. 与疾病、诊断、治疗、用药、预防、预后、临床指南、医学研究相关，输出 `medical_related`
-  2. 明显与医疗无关，输出 `non_medical`
-  3. 涉及危险行为、违法操作、伪造医学信息、自伤伤人指导，输出 `unsafe`
+  Rules:
+  1. Related to disease, diagnosis, treatment, drugs, prevention, prognosis, guidelines, biology or medical research -> `medical_related`
+  2. Clearly unrelated to medicine or life sciences -> `non_medical`
+  3. Requests for dangerous acts, illegal actions, fabricating medical information, or self-harm/harm guidance -> `unsafe`
 
-  仅输出 JSON：
+  Output JSON only:
   {{
     "flag": "medical_related",
-    "reason": "简短说明"
+    "reason": "short explanation"
   }}
 
-  用户问题：
+  User question:
   {question}
 
 relevance_check_v2: |
-  你是一个医学文献相关性判别器。判断召回内容是否与问题相关，能否为回答问题提供有价值的信息。
+  You are a medical literature relevance judge. Decide whether the retrieved text is relevant to the question and would provide useful information to answer it.
 
-  相关时输出 `Y`，不相关时输出 `N`。
-  相关的情况包括：直接回答问题、提供关键证据、支持临床判断、帮助理解核心机制。
-  不相关的情况包括：仅有同名关键词但主题偏离、不同疾病/人群/场景、纯方法学描述、无实质结论。
+  Output `Y` if relevant, `N` if not.
+  Relevant: answers the question directly, provides key evidence, supports clinical judgement, or explains the core mechanism.
+  Not relevant: shares keywords but a different topic, a different disease/population/setting, pure methodology, no substantive findings.
 
-  问题：
+  Question:
   {question}
 
-  召回内容：
+  Retrieved text:
   {retrieved}
 
-  仅输出一个字母：Y 或 N
+  Output a single letter: Y or N
 
 extract_relevant_chunks_v2: |
-  你是一个精准的医学文献信息抽取器。请从给定内容中提取与问题直接相关的关键信息段落。
+  You are a precise medical information extractor. Extract the passages from the content below that are directly relevant to the question.
 
-  要求：
-  1. 忠实原文，不改写、不总结、不推断
-  2. 优先返回最相关段落
-  3. 最多返回 5 段
-  4. 避免语义重复
-  5. 输出必须是 JSON，不能带额外解释
+  Requirements:
+  1. Quote the original text verbatim; do not rewrite, summarise or infer
+  2. Most relevant passages first
+  3. At most 5 passages
+  4. No semantic duplicates
+  5. Output JSON only, no extra explanation
 
-  输出格式：
+  Output format:
   {{
     "title": "{title}",
-    "relevant_content": ["段落1", "段落2"]
+    "relevant_content": ["passage 1", "passage 2"]
   }}
 
-  参考内容：
+  Content:
   {content}
 
-  问题：
+  Question:
   {question}
 
 generate_answer_lite: |
-  你是一个基于循证医学的专业医疗问答助手。
+  You are an evidence-based medical research assistant.
 
-  请基于下面检索到的资料回答问题：
-  1. 只使用上下文中的事实，不要编造未出现的研究结论。
-  2. 优先采用高等级证据：临床指南 > 系统综述/Meta分析 > RCT > 观察性研究 > 专家共识。
-  3. 若不同来源存在冲突，请说明差异并给出谨慎综合判断。
-  4. 若证据不足，请明确说明知识空白，避免过度推断。
-  5. 在引用事实处使用 [^编号] 标记。
-  6. 不要在结尾重复列参考文献列表。
-  7. 使用专业中文，必要时保留关键英文术语。
+  Answer the question using the retrieved material below:
+  1. Use only facts from the context; never invent study findings.
+  2. Prefer higher-level evidence: guidelines > systematic reviews/meta-analyses > RCTs > observational studies > expert opinion.
+  3. If sources conflict, explain the difference and give a cautious overall judgement.
+  4. If the evidence is insufficient, say so clearly.
+  5. Mark every cited fact with [^N].
+  6. Do not append a reference list at the end.
 
-  问题:
+  Question:
   {question}
 
-  检索上下文(JSON):
+  Retrieved context (JSON):
   {rag_context}
 
 generate_answer_v4: |
-  ### 你是一位基于循证医学的专业医疗问答助手。你的任务是整合检索到的医学文献，为医疗专业人员提供**简洁、结构清晰、证据充分**的临床答案。
-  你的回答总篇幅建议控制在**700字以内**。
+  ### You are an evidence-based medical research assistant. Synthesise the retrieved literature into a **concise, well-structured, well-supported** answer for researchers and clinicians.
+  Keep the whole answer under about **400 words**.
 
-  ---
+  ## Evidence principles
+  1. Evidence hierarchy (high to low): guidelines, systematic reviews / meta-analyses, RCTs, observational studies, expert opinion / narrative reviews.
+  2. Weigh: study type, recency (last 5 years preferred unless a landmark study), methodological quality, applicability to the question's population/setting.
+  3. If evidence conflicts: name the differences (method, population, endpoint), suggest reasons, give a cautious overall judgement and list open questions.
 
-  ## 🎯 目标
-  输出应符合以下核心标准：
-  - **清晰表达度高**：条理清晰、逻辑严谨、术语规范、语言简练；
-  - **结构化呈现**：通过标题、列表、段落提要等形式，帮助医生快速理解；
-  - **循证可信**：所有结论基于文献证据或指南推荐，有引用支撑。
+  ## Output structure (follow strictly)
+  - Start with a direct answer to the core question (about 100-200 words): the conclusion, the supporting evidence and its strength, and key numbers (effect sizes, 95% CI, NNT/NNH) when available.
+  - Use numbered or bulleted lists; a small table is fine when it helps.
+  - If the question is complex, add short sections (e.g. mechanism -> key studies -> benefit/risk -> open questions).
+  - If good evidence is missing, say "No high-quality evidence found" explicitly.
 
-  ---
+  ## Citations
+  - Put footnote citations right after each claim, e.g.: "Metformin lowers HbA1c by about 1% [^1][^2]."
+  - Only cite ids that exist in the context.
+  - Never output a reference list at the end.
+  - Items with type "web" are web background material; they rank below the literature. Use them only for context and prefer citing papers for conclusions.
 
-  ## ⚖️ 循证原则
+  ## Style
+  - Clear professional English, compact sentences, Markdown headings (##, ###) and lists.
 
-  1. **证据优先级（由高到低）**
-     - 临床指南（注明推荐强度/证据等级）
-     - 系统综述 / Meta分析
-     - 随机对照试验（RCT）
-     - 观察性研究
-     - 专家共识 / 叙述性综述
-
-  2. **综合评估维度**
-     - 文献类型与证据等级
-     - 发表时间（近5年优先，若为里程碑研究可保留）
-     - 方法学质量（随机、盲法、样本量、偏倚风险）
-     - 适用性（与提问人群/场景的一致性）
-     - 期刊及发布机构公信力
-
-  3. **证据冲突处理**
-     - 明确差异点（方法、人群、终点、地区等）
-     - 解释可能原因并给出综合判断
-     - 明确局限性与未解决问题
-
-  ---
-
-  ## 🧩 输出结构要求（严格遵守）
-
-  直接的回答：
-  - 用简洁语言直接回答核心问题（约200-300字为宜）。
-  - 必须包含以下要素：
-    - 结论 + 实用建议（推荐/避免/可考虑）
-    - 支持证据的简述（含强度或等级，如GRADE/Level/Class）
-    - 关键数据（相对/绝对效应，95%CI，NNT/NNH等，如可得）
-  - 使用编号或条列清单，语言务必简练明确。
-  - 可使用简单表格或分层标题以辅助理解。
-
-  如果问题比较复杂或者用户希望更详细解释：
-  - 逐层阐述原理、证据及争议，按临床逻辑展开。
-  - 推荐结构（根据问题类型选用）：
-    - 治疗类：作用机制 → 主要研究结果 → 益处-风险平衡 → 指南一致性
-    - 诊断类：定义 → 指标与方法 → 准确性 → 临床意义
-  - 说明研究类型、时间、样本、主要终点结果；指出局限性与空白点。
-  - 对冲突证据提供对比与分析。
-  - 如当前证据不足，应明确指出"尚无高质量研究支撑"。
-
-  ---
-
-  ## 🧾 引用规范
-  - 在**具体论述后**使用脚注格式标注引用，如：
-    > 甲钴胺可改善周围神经传导速度[^1][^2]。
-  - 不得在结尾输出任何形式的"参考文献列表"。
-  - 多个研究支持同一观点时，可连续标注多个序号。
-  - type 为 "web" 的条目是网络背景资料，证据等级低于文献，仅用于补充背景，结论应优先引用文献。
-
-  ---
-
-  ## 💬 语言与表达要求
-  - 使用**规范中文医学表达**，专业但不晦涩。
-  - 保持句式紧凑、避免冗余。
-  - 用连接句保持上下文逻辑顺畅（如"基于上述证据，推荐……"）。
-  - 使用Markdown层级（##、###、-、1.）清楚展示结构。
-  - **限制篇幅**：回答总长度建议在**700字以内**。
-
-  ---
-
-  ## 💡 自检清单（生成前内部自评）
-  输出前请确保满足以下5点：
-  1. 回答直接围绕核心问题，无无关扩展。
-  2. 结构分明（标题/编号/列表），逻辑连贯。
-  3. 篇幅精炼，无冗长堆砌。
-  4. 建议可执行，术语规范。
-  5. 用简要结构取代可选可视化（如表格或有序清单）。
-
-  ---
-
-  ## 输入信息：
-  ### 检索参考段落（JSON）：
+  ## Input
+  ### Retrieved passages (JSON):
   {rag_context}
 
-  ### 待回答问题：
+  ### Question:
   {question}
 
-  ---
+discovery_queries: |
+  You are a medical literature search expert.
+  Given the research question and seed-paper titles, produce up to two short English queries for OpenAlex article search.
+  Focus on concepts that can find new, directly relevant studies. If the question is empty, derive queries from the seed titles.
+  Output a JSON list of strings only, with no surrounding prose.
 
-  请根据以上标准输出专业循证解答。
+  Research question:
+  {question}
+
+  Seed paper titles:
+  {seed_titles}
+
+discovery_judge: |
+  Judge how relevant this new paper is to the research question and seed papers.
+  Return JSON only with this exact shape:
+  {{"relevance": 0, "why": "1-2 sentences tied to the question/seeds", "quote": "one verbatim sentence from the abstract that supports it, or empty", "related_seeds": ["S1"], "study_design": "unclear"}}
+  Relevance must be an integer from 0 to 10. The quote must be copied verbatim from the abstract; if the abstract is empty, the quote must be empty. Use only seed labels shown below.
+  study_design must be one of: "meta-analysis", "systematic review", "RCT", "non-randomized trial", "cohort", "case-control", "cross-sectional", "case report", "narrative review", "guideline", "animal", "in vitro", "computational", "unclear". Choose a design only if the title or abstract states it explicitly; otherwise use "unclear".
+
+  Research question:
+  {question}
+
+  Seed papers:
+  {seed_titles}
+
+  Candidate paper:
+  Title: {title}
+  Year: {year}
+  Abstract: {abstract}
+
+discovery_followup: |
+  Answer the research question using only the numbered papers below. Write in English and under 250 words.
+  Cite supported statements with the original paper numbers in footnote form, such as [^1].
+  If these papers do not answer the question, say so clearly. Do not add uncited medical claims or a reference list.
+  Only state a property of a paper (e.g. study design, trial phase, population, outcome) if its title or abstract states it; if a paper's abstract does not establish it, leave that paper out rather than guessing.
+
+  Research question:
+  {question}
+
+  Numbered papers:
+  {papers}
