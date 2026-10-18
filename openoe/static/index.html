@@ -227,11 +227,122 @@ sup.cite:hover .cite-tooltip{opacity:1}
 .msg.bot p{margin:6px 0}
 .chat-box{display:flex;gap:8px;margin-top:10px}.chat-box input{flex:1}
 .thread-actions{max-width:720px;margin:-6px auto 10px;padding:0 20px;text-align:right}
+/* ===== Minimal light theme ===== */
+:root{
+  --bg:#fbfbfa;--bg2:#ffffff;
+  --card:#ffffff;--card-hover:#ffffff;
+  --glass:#f5f5f4;--border:#e9e9e7;
+  --accent:#0f766e;--accent-dim:#eef7f5;--accent-glow:rgba(15,118,110,.18);
+  --text:#1d1d1f;--text2:#6e6e73;--muted:#a1a1a6;
+  --danger:#c2410c;--warn:#b45309;
+  --ink:#111111;
+  --r:14px;--rs:10px;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+body{background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+a{color:var(--accent)}
+.header{padding:64px 20px 8px}
+.header h1{font-size:2.6rem;font-weight:650;letter-spacing:-.035em;color:var(--ink)}
+.header h1 span{color:var(--ink)}
+.header h1 em{font-style:normal;color:var(--accent)}
+.header p{color:var(--text2);font-size:1.05rem;margin-top:6px}
+.tabs{display:inline-flex;gap:2px;background:#efefed;border-radius:12px;padding:3px;margin-top:22px;border:none}
+.header .tabs{display:inline-flex}
+.tab{background:none;border:none;border-radius:9px;color:var(--text2);padding:7px 18px;font-weight:500}
+.tab.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08);border:none}
+.tab:hover{color:var(--ink)}
+.disc-form{max-width:760px;margin:28px auto 8px;background:#fff;border:1px solid var(--border);border-radius:18px;padding:22px 24px;box-shadow:var(--shadow);gap:8px}
+.disc-form label{font-size:.78rem;font-weight:600;color:var(--text2);text-transform:none;letter-spacing:0;margin-top:4px}
+.disc-form input,.disc-form textarea,.chat-box input{background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:.98rem;transition:border .15s,box-shadow .15s}
+.disc-form input:focus,.disc-form textarea:focus,.chat-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);background:#fff}
+.disc-form textarea{min-height:92px;font-size:.85rem}
+.disc-form .row{margin-top:8px}
+.btn,.search-box button{background:var(--ink);color:#fff;border-radius:999px;padding:9px 20px;font-weight:550;font-size:.9rem;transition:opacity .15s}
+.btn:hover,.search-box button:hover{opacity:.85}
+.btn.ghost{background:#fff;color:var(--text);border:1px solid var(--border);font-weight:500}
+.btn.ghost:hover{border-color:#cfcfcc;color:var(--ink)}
+.hint{color:var(--muted);font-size:.8rem;line-height:1.5}
+.disc-form .row .hint{flex-basis:100%;margin-top:4px}
+.search-wrap{max-width:720px;margin:28px auto 12px}
+.search-box{background:#fff;border:1px solid var(--border);border-radius:999px;padding:6px 6px 6px 22px;box-shadow:var(--shadow)}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.chip{background:#fff;border:1px solid var(--border);color:var(--text2);border-radius:999px}
+.chip:hover{border-color:#cfcfcc;color:var(--ink)}
+.container{max-width:1120px}
+.progress-card{background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--r)}
+.progress-bar-track{background:#efefed;height:3px}
+.progress-bar-fill{background:var(--accent)}
+.stage-item.completed .stage-icon{color:var(--accent)}
+.seeds-bar{margin:18px 0 12px}
+.seed-chip{background:#fff;border:1px solid var(--border);color:var(--text);border-radius:999px;padding:5px 12px}
+.seed-chip b{color:var(--accent);font-weight:650}
+.seed-chip:hover{text-decoration:none;border-color:#cfcfcc}
+.toolbar{background:none;border:none;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;padding:12px 0;gap:8px 14px;color:var(--text2)}
+.toolbar select,.toolbar input[type=number],.toolbar input[type=text]{background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 9px;color:var(--text)}
+.toolbar .btn{padding:6px 14px;font-size:.82rem}
+.toolbar input[type=checkbox]{accent-color:var(--accent)}
+.stats-bar{background:none;border:none;padding:0;color:var(--muted);font-size:.8rem;gap:6px 12px}
+.stats-bar .accent{color:var(--text);font-weight:600}
+.stats-bar .sep{color:#d4d4d1}
+.side .box{background:#fff;border:1px solid var(--border);border-radius:var(--r);box-shadow:none}
+.side h3{text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:600;color:var(--ink)}
+.pcard{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:12px;box-shadow:none;transition:box-shadow .2s,border-color .2s}
+.pcard:hover{box-shadow:var(--shadow);border-color:#e0e0dd}
+.pcard.hl{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.pcard.liked{border-left:3px solid var(--accent)}
+.prank{background:none;color:var(--muted);font-weight:600;min-width:22px;height:auto;font-size:.85rem;justify-content:flex-start;padding-top:2px}
+.ptitle{font-size:1.04rem;font-weight:600;letter-spacing:-.01em}
+.ptitle a:hover{text-decoration:underline;text-decoration-color:#cfcfcc}
+.pmeta{color:var(--text2);font-size:.8rem;margin-top:4px}
+.pscore{font-size:.7rem;color:var(--muted)}
+.pscore b{font-size:1.25rem;font-weight:650;color:var(--ink);letter-spacing:-.02em}
+.scorebar{background:#efefed;height:3px;width:56px;margin-left:auto}
+.scorebar i{background:var(--accent)}
+.why{font-size:.93rem;color:var(--text);margin:12px 0 8px}
+.why strong{font-weight:600}
+.quote{background:#f6faf9;border-left:2px solid var(--accent);font-style:normal;color:#3a3a3c;border-radius:0 8px 8px 0;padding:8px 12px;font-size:.86rem}
+.quote.unv{background:#fdf8f0;border-left-color:#d97706}
+.qflag{display:block;margin:4px 0 0;font-size:.72rem;font-weight:600}
+.qflag.ok{color:var(--accent)}.qflag.no{color:var(--warn)}
+.badges{gap:6px;margin:10px 0 6px}
+.sig,.sig.cite,.sig.web,.sig.oa{background:var(--glass);color:var(--text2);border-radius:6px;font-size:.72rem;padding:2px 8px;font-weight:500}
+.sig.cite{background:#eef7f5;color:#0f766e}
+.sig.web{background:#fdf6ec;color:#9a5b13}
+.sig.oa{background:#eff6ff;color:#1d4ed8}
+.comp{color:var(--muted);font-size:.72rem}
+.plinks{gap:14px;margin-top:10px;font-size:.82rem}
+.plinks a{color:var(--text);font-weight:500;border-bottom:1px solid #d4d4d1}
+.plinks a:hover{text-decoration:none;border-color:var(--ink)}
+.plinks button{background:none;border:1px solid var(--border);color:var(--text2);border-radius:999px;padding:3px 11px}
+.plinks button:hover{color:var(--ink);border-color:#cfcfcc}
+.plinks button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.abstract{color:#3a3a3c;background:var(--bg);border-radius:10px;padding:12px 14px;margin-top:10px}
+.graph-wrap{background:#fff;border:1px solid var(--border);border-radius:16px}
+.chat{background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:20px 22px}
+.chat h3{font-weight:600;color:var(--ink)}
+.msg.user{background:var(--glass);color:var(--ink);border-radius:12px;padding:9px 14px;display:inline-block;max-width:85%}
+.msg.bot{color:var(--text)}
+.chat-box input{border-radius:999px;padding:10px 16px}
+.answer-card,.refs-panel,.ref-card,.ref-modal{background:#fff;border:1px solid var(--border);box-shadow:none;color:var(--text)}
+.ref-card:hover{border-color:#cfcfcc;background:#fff}
+.ref-card.highlight{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.qa-question{color:var(--ink);font-weight:600}
+.qa-question::before{color:var(--accent)}
+sup.cite{background:var(--accent-dim);color:var(--accent);border-radius:4px}
+sup.cite:hover{background:var(--accent);color:#fff}
+.cite-tooltip{background:var(--ink);color:#fff;border:none;box-shadow:var(--shadow)}
+.ref-modal-overlay{background:rgba(0,0,0,.25);backdrop-filter:blur(6px)}
+.error-msg{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px}
+.warn-msg{color:var(--warn)}
+.footer{color:var(--muted);font-size:.75rem;padding:40px 20px;border-top:none}
+.web-item p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.chat .cite-tooltip{max-width:260px;white-space:normal}
 </style>
 </head>
 <body>
 <header class="header">
-  <h1><span>Medic</span>Up</h1>
+  <h1>Medic<em>Up</em></h1>
   <p>Start from papers you trust. Discover the ones you're missing.</p>
   <div class="tabs">
     <button class="tab active" data-tab="discover">Discover papers</button>
@@ -778,7 +889,7 @@ function render(){
   const d=state.data; $("discResults").style.display="block";
   $("seedsBar").innerHTML=(d.seeds||[]).map((s,i)=>`<a class="seed-chip" href="${esc(s.links?.doi||s.links?.openalex||"#")}" target="_blank" rel="noopener" title="${esc(s.title)}"><b>S${i+1}</b>${esc(s.title)}${s.year?` (${s.year})`:""}</a>`).join("");
   $("unresolved").innerHTML=(d.unresolved||[]).length?`<div class="warn-msg">Could not resolve: ${d.unresolved.map(esc).join(", ")}</div>`:"";
-  if((d.errors||[]).length)$("unresolved").innerHTML+=`<div class="warn-msg">Some sources had errors (results may be incomplete): ${d.errors.slice(0,3).map(e=>esc(typeof e==="string"?e:JSON.stringify(e)).slice(0,160)).join("; ")}</div>`;
+  if((d.errors||[]).length)$("unresolved").innerHTML+=`<div class="warn-msg">Some sources were temporarily unavailable, so results may be incomplete: ${[...new Set(d.errors.map(e=>String(typeof e==="string"?e:JSON.stringify(e)).split(":")[0]))].map(esc).join(", ")}</div>`;
   const st=d.stats||{}, tm=d.timings||{};
   const totMs=tm.total_ms??tm.done??Object.values(tm).reduce((a,b)=>Math.max(a,+b||0),0); const tot=(totMs/1000).toFixed(1);
   const sigCounts=st.signals||st.by_signal||{};
@@ -808,8 +919,8 @@ ${quote}
 <div class="comp">LLM relevance ${c.llm_relevance??"–"}/10 · similarity ${f(c.similarity)} · linked seeds ${c.seed_links??0} · signals ${c.n_signals??(p.signals||[]).length} · pre-score ${f(c.pre_score)}</div>
 <div class="plinks" style="margin-top:8px">${links}
 <button type="button" data-act="abs" data-id="${esc(id)}">Abstract</button>
-<button type="button" data-act="like" data-id="${esc(id)}" class="${state.liked.has(id)?"on":""}">👍 Add as seed</button>
-<button type="button" data-act="dislike" data-id="${esc(id)}" class="${state.disliked.has(id)?"on":""}">👎 Not relevant</button></div>
+<button type="button" data-act="like" data-id="${esc(id)}" class="${state.liked.has(id)?"on":""}">+ Add as seed</button>
+<button type="button" data-act="dislike" data-id="${esc(id)}" class="${state.disliked.has(id)?"on":""}">− Not relevant</button></div>
 <div class="abstract" id="abs-${esc(id)}">${esc(p.abstract||"No abstract available.")}</div></div>`;
 }
 $("cards").addEventListener("click",e=>{
@@ -829,11 +940,11 @@ function graph(){
   const rp=res.map((p,i)=>{const a=(i/Math.max(1,res.length))*2*Math.PI-Math.PI/2,r=150+(1-(p.score||0))*170;return {x:cx+r*1.55*Math.cos(a),y:cy+r*Math.sin(a)*.95};});
   let edges="",nodes="";
   res.forEach((p,i)=>{const linked=new Set();(p.signals||[]).forEach(s=>(s.seeds||[]).forEach(k=>linked.add(k)));(p.related_seeds||[]).forEach(k=>linked.add(k));
-    linked.forEach(k=>{if(sp[k])edges+=`<line x1="${sp[k].x}" y1="${sp[k].y}" x2="${rp[i].x}" y2="${rp[i].y}" stroke="rgba(0,212,170,.25)" stroke-width="1.2"/>`;});
-    const r=7+(p.score||0)*10, col=(p.signals||[]).some(s=>s.type==="web")?"#ffc078":linked.size?"#00d4aa":"#9fb8ff";
-    nodes+=`<g style="cursor:pointer" data-id="${esc(p.openalex_id)}"><circle cx="${rp[i].x}" cy="${rp[i].y}" r="${r}" fill="${col}" fill-opacity=".75"><title>#${p.rank} ${esc(p.title)} (${p.year||""})</title></circle><text x="${rp[i].x}" y="${rp[i].y+3.5}" font-size="10" text-anchor="middle" fill="#0a1628" font-weight="700">${p.rank}</text></g>`;});
-  seeds.forEach((s,i)=>{nodes+=`<g><circle cx="${sp[i].x}" cy="${sp[i].y}" r="18" fill="#ff8f6b"><title>S${i+1} ${esc(s.title)}</title></circle><text x="${sp[i].x}" y="${sp[i].y+4}" font-size="11" text-anchor="middle" fill="#0a1628" font-weight="700">S${i+1}</text></g>`;});
-  $("graphWrap").innerHTML=`<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}<text x="12" y="20" fill="#8899aa" font-size="12">Seeds (orange) in the centre · results closer = higher score · green = linked to seeds by citations · blue = found by similarity/search/recommendation · amber = web · click a node</text></svg>`;
+    linked.forEach(k=>{if(sp[k])edges+=`<line x1="${sp[k].x}" y1="${sp[k].y}" x2="${rp[i].x}" y2="${rp[i].y}" stroke="rgba(15,118,110,.18)" stroke-width="1.2"/>`;});
+    const r=7+(p.score||0)*10, col=(p.signals||[]).some(s=>s.type==="web")?"#f59e0b":linked.size?"#0f766e":"#93c5fd";
+    nodes+=`<g style="cursor:pointer" data-id="${esc(p.openalex_id)}"><circle cx="${rp[i].x}" cy="${rp[i].y}" r="${r}" fill="${col}" fill-opacity=".75"><title>#${p.rank} ${esc(p.title)} (${p.year||""})</title></circle><text x="${rp[i].x}" y="${rp[i].y+3.5}" font-size="10" text-anchor="middle" fill="#ffffff" font-weight="700">${p.rank}</text></g>`;});
+  seeds.forEach((s,i)=>{nodes+=`<g><circle cx="${sp[i].x}" cy="${sp[i].y}" r="18" fill="#111111"><title>S${i+1} ${esc(s.title)}</title></circle><text x="${sp[i].x}" y="${sp[i].y+4}" font-size="11" text-anchor="middle" fill="#ffffff" font-weight="700">S${i+1}</text></g>`;});
+  $("graphWrap").innerHTML=`<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}<text x="12" y="20" fill="#a1a1a6" font-size="12">Seeds (black) in the centre · results closer = higher score · green = linked to seeds by citations · blue = found by similarity/search/recommendation · amber = web · click a node</text></svg>`;
   $("graphWrap").querySelectorAll("g[data-id]").forEach(g=>g.addEventListener("click",()=>focusCard(g.dataset.id)));
 }
 function focusCard(id){const el=$("pc-"+id);if(!el)return;el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("hl");setTimeout(()=>el.classList.remove("hl"),2000);}
