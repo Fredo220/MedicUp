@@ -314,11 +314,12 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
 <div class="app" id="app">
   <aside class="side">
     <div class="side-top">
-      <div class="brand"><div class="logo">MU</div>MedicUp</div>
+      <a class="brand" href="/" title="MedicUp home"><img src="/static/brand/medicup-logo.png" alt="MedicUp" style="height:26px;width:auto;display:block;background:#fff;border-radius:6px;padding:2px 5px"></a>
       <button class="iconbtn" id="sideClose" title="Close sidebar"><svg class="i"><use href="#i-side"/></svg></button>
     </div>
     <nav class="nav">
       <button class="nav-item" id="newChat"><svg class="i"><use href="#i-new"/></svg>New Chat</button>
+      <a class="nav-item" href="/app"><svg class="i"><use href="#i-spark"/></svg>Discovery dashboard</a>
       <button class="nav-item" id="searchBtn"><svg class="i"><use href="#i-search"/></svg>Search</button>
       <input class="side-search" id="sideSearch" placeholder="Search chats">
       <button class="nav-item" id="readingBtn"><svg class="i"><use href="#i-book"/></svg>Reading list<span class="cnt" id="rlCount">0</span></button>
@@ -347,7 +348,7 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
       </div>
     </div>
     <div class="hero">
-      <div class="hero-title"><div class="logo">MU</div><h1 id="heroName">MedicUp Discover</h1></div>
+      <div class="hero-title"><div class="logo" style="background:#fff;border:1px solid var(--border,#e5e5e5)"><img src="/static/brand/medicup-mark.png" alt="" style="width:62%"></div><h1 id="heroName">MedicUp Discover</h1></div>
       <div class="composer-slot" id="slotHero"></div>
       <div class="suggest">
         <div class="lbl"><svg class="i sm"><use href="#i-spark"/></svg>Suggested</div>
@@ -515,7 +516,7 @@ function scrollEnd(){const s=$("scroll");s.scrollTop=s.scrollHeight;}
 function msgHtml(m){
   if(m.role==="user")return `<div class="umsg" id="m-${m.id}"><div style="max-width:78%;display:flex;flex-direction:column;align-items:flex-end"><div class="ububble" style="max-width:100%">${esc(m.text||"Find more papers like my seeds")}</div>${(m.seeds||[]).length?`<div class="useeds">${m.seeds.map(s=>`<span class="chip mono" title="${esc(s)}">${ic("paper","sm")}${esc(s.length>48?s.slice(0,46)+"…":s)}</span>`).join("")}</div>`:""}</div></div>`;
   const label=m.kind==="discover"?"Discover":m.kind==="ask"?"Ask":"Follow-up";
-  return `<div class="amsg" id="m-${m.id}"><div class="logo">MU</div><div class="abody"><div class="aname">MedicUp <small>${label}</small></div>${m.kind==="discover"?discHtml(m):m.kind==="ask"?askHtml(m):fuHtml(m)}</div></div>`;
+  return `<div class="amsg" id="m-${m.id}"><div class="logo" style="background:#fff;border:1px solid var(--border,#e5e5e5)"><img src="/static/brand/medicup-mark.png" alt="" style="width:62%"></div><div class="abody"><div class="aname">MedicUp <small>${label}</small></div>${m.kind==="discover"?discHtml(m):m.kind==="ask"?askHtml(m):fuHtml(m)}</div></div>`;
 }
 function statusHtml(m,stages,summary){
   const idx=m.status==="done"?stages.length:Math.max(0,stages.findIndex(s=>s[0]===m.stage));
