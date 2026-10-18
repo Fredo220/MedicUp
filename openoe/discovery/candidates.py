@@ -12,6 +12,7 @@ import httpx
 
 from openoe.discovery.models import Paper, normalize_doi, paper_from_work, short_openalex_id
 from openoe.discovery.openalex import OpenAlexClient
+from openoe.discovery.pubmed import search_pubmed
 from openoe.discovery.seeds import parse_seed
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
@@ -61,20 +62,36 @@ async def gather_candidates(
         elif kind == "doi":
             disliked_dois.add(parsed.lower())
 
-    def add_work(work: Dict[str, Any], signal: Dict[str, Any]) -> None:
-        paper = paper_from_work(work)
+    seed_pmids = {paper.pmid for paper in seeds if paper.pmid}
+    key_by_doi: Dict[str, str] = {}
+    key_by_pmid: Dict[str, str] = {}
+
+    def add_paper(paper: Optional[Paper], signal: Dict[str, Any]) -> None:
         if not paper or paper.openalex_id in seed_ids or paper.openalex_id in disliked_ids:
             return
-        if paper.doi and paper.doi.lower() in (seed_dois | disliked_dois):
+        doi = (paper.doi or "").lower()
+        if doi and doi in (seed_dois | disliked_dois):
             return
-        record = candidate_map.get(paper.openalex_id)
+        if paper.pmid and paper.pmid in seed_pmids:
+            return
+        key = paper.openalex_id
+        if key not in candidate_map:
+            key = key_by_doi.get(doi) or key_by_pmid.get(paper.pmid or "") or key
+        record = candidate_map.get(key)
         if record is None:
             if len(candidate_map) >= 200:
                 return
             record = {"paper": paper, "signals": []}
-            candidate_map[paper.openalex_id] = record
+            candidate_map[key] = record
+            if doi:
+                key_by_doi[doi] = key
+            if paper.pmid:
+                key_by_pmid[paper.pmid] = key
         if signal not in record["signals"]:
             record["signals"].append(signal)
+
+    def add_work(work: Dict[str, Any], signal: Dict[str, Any]) -> None:
+        add_paper(paper_from_work(work), signal)
 
     async def cited_by_seeds() -> None:
         if not _enabled(cfg, "cited_by_seeds"):
@@ -168,11 +185,23 @@ async def gather_candidates(
             errors.append(f"Discovery query generation: {exc}")
             queries = []
         if not queries:
-            queries = [paper.title for paper in seeds[:2]]
-        batches = await asyncio.gather(*(client.search(query, 15) for query in queries[:2]))
-        for query, works in zip(queries[:2], batches):
+            queries = [paper.title for paper in seeds[:2]] or [question]
+        if not seeds and question.strip() and question not in queries:
+            queries.insert(0, question)
+        n_queries, per_query = (3, 25) if not seeds else (2, 15)
+        queries = queries[:n_queries]
+        batches = await asyncio.gather(*(client.search(query, per_query) for query in queries))
+        for query, works in zip(queries, batches):
             for work in works:
                 add_work(work, {"type": "search", "query": query})
+        for query in [query for query, works in zip(queries, batches) if not works]:
+            try:
+                papers = await search_pubmed(query, per_query)
+            except Exception as exc:
+                errors.append(f"PubMed search: {type(exc).__name__}")
+                continue
+            for paper in papers:
+                add_paper(paper, {"type": "search", "query": query, "source": "pubmed"})
 
     async def web_search() -> None:
         nonlocal web_context

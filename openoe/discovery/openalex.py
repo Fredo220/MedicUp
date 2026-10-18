@@ -1,6 +1,7 @@
 """Async OpenAlex client with request-local in-memory GET caching."""
 from __future__ import annotations
 
+import asyncio
 import copy
 import logging
 import os
@@ -34,6 +35,7 @@ class OpenAlexClient:
         self.cache: Dict[tuple, Any] = {}
         self.errors: List[str] = []
         self.search_calls = 0
+        self.rate_limited = False
 
     async def _get(self, url: str, params: Dict[str, Any]) -> Any:
         request_params = dict(params)
@@ -49,6 +51,10 @@ class OpenAlexClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, params=request_params)
                 if response.status_code == 429:
+                    await asyncio.sleep(1.5)
+                    response = await client.get(url, params=request_params)
+                if response.status_code == 429:
+                    self.rate_limited = True
                     raise httpx.HTTPStatusError(
                         "OpenAlex rate limited (429)", request=response.request, response=response
                     )

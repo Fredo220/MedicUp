@@ -215,7 +215,9 @@ async def rank_candidates(
     similarities: List[float] = []
     for vector in candidate_vectors:
         seed_similarity = _cosine(centroid, vector)
-        if question_index is not None:
+        if question_index is not None and not seeds:
+            similarities.append(_cosine(question_vector, vector))
+        elif question_index is not None:
             similarities.append(0.5 * _cosine(question_vector, vector) + 0.5 * seed_similarity)
         else:
             similarities.append(seed_similarity)
@@ -246,7 +248,7 @@ async def rank_candidates(
     to_judge = scored[:max(0, judge_k)]
     timings["rank"] = (time.perf_counter() - rank_started) * 1000
     await notify("judge", "Judging the highest-ranked candidates", {"n_judged": len(to_judge)})
-    seed_titles = "\n".join(f"S{index + 1}: {paper.title}" for index, paper in enumerate(seeds))
+    seed_titles = "\n".join(f"S{index + 1}: {paper.title}" for index, paper in enumerate(seeds)) or "(none — judge against the research question only; related_seeds must be [])"
     semaphore = asyncio.Semaphore(10)
     judge_started = time.perf_counter()
 

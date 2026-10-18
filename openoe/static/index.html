@@ -359,7 +359,7 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
     <div class="bottom"><div class="composer-slot" id="slotBottom"></div><div class="disclaimer">MedicUp can make mistakes. Check the sources. Not a substitute for clinical judgement.</div></div>
     <form class="composer" id="composer" autocomplete="off">
       <div class="seedbox" id="seedbox">
-        <div class="seedbox-head"><svg class="i sm"><use href="#i-paper"/></svg><b>Seed papers</b><span>one per line · DOI, PMID, PubMed / OpenAlex link or title</span><span class="sp"></span><button type="button" class="linkbtn" id="exampleBtn">Example</button><button type="button" class="linkbtn" id="seedClear">Clear</button></div>
+        <div class="seedbox-head"><svg class="i sm"><use href="#i-paper"/></svg><b>Seed papers</b><span>optional · one per line · DOI, PMID, PubMed / OpenAlex link or title</span><span class="sp"></span><button type="button" class="linkbtn" id="exampleBtn">Example</button><button type="button" class="linkbtn" id="seedClear">Clear</button></div>
         <textarea id="seeds" placeholder="10.1056/NEJMoa1003466&#10;PMID 26027431&#10;Defining T cell states associated with response to checkpoint immunotherapy"></textarea>
       </div>
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
@@ -458,7 +458,7 @@ function updateComposer(){
   const n=seedList().length;
   $("seedToolLbl").textContent=n?`${n} seed paper${n>1?"s":""}`:"Seed papers";
   $("seedTool").classList.toggle("on",n>0||$("seedbox").classList.contains("open"));
-  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()&&prefs.mode==="discover"?"Ask a follow-up about these papers…":prefs.mode==="discover"?"Research question — add seed papers with +":"How can I help you today?";
+  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()&&prefs.mode==="discover"?"Ask a follow-up about these papers…":prefs.mode==="discover"?"Ask a research question, or add seed papers with + (either is enough)":"How can I help you today?";
   $("sendBtn").disabled=busy||(!input.value.trim()&&!n);
 }
 function autosize(){input.style.height="auto";input.style.height=Math.min(input.scrollHeight,220)+"px";}
@@ -470,7 +470,7 @@ $("composer").addEventListener("submit",e=>{e.preventDefault();if(busy)return;
   if(seeds.length)return startDiscover(q,seeds);
   if(!q)return;
   if(hasDiscovery()&&prefs.mode==="discover")return startFollowup(q);
-  if(prefs.mode==="discover"){openSeeds(true);toast("Add at least one seed paper, or switch to MedicUp Ask");return;}
+  if(prefs.mode==="discover")return startDiscover(q,[]);
   startAsk(q);
 });
 function clearComposer(){input.value="";seedsEl.value="";openSeeds(false);autosize();updateComposer();}
@@ -543,7 +543,7 @@ function discHtml(m){
   else if(u.tab==="web")body=(d.web_context||[]).length?`<div class="hint" style="margin-bottom:8px">Background found by Tavily web search. Use it for context; rely on the papers for evidence.</div><div class="web">${d.web_context.map(w=>`<div class="webi"><div class="h">${esc(host(w.url))}</div><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join("")}</div>`:`<div class="hint">No web sources for this run.</div>`;
   else body=traceHtml(m,secs);
   return statusHtml(m,DSTAGES,`Found ${st.n_candidates??"?"} candidates, AI-checked ${st.n_judged??"?"}, showing ${all.length} · ${secs}s`)+errorNote(m)
-   +`<div class="section-lbl">Seed papers</div><div class="seeds">${seeds}</div>`
+   +(seeds?`<div class="section-lbl">Seed papers</div><div class="seeds">${seeds}</div>`:"")
    +(errs.length?`<div class="note warn">Some sources were temporarily unavailable, so results may be incomplete: ${errs.map(esc).join(", ")}</div>`:"")
    +summary
    +`<div class="tabs">${tabs.map(t=>`<button class="tab${u.tab===t[0]?" on":""}" data-tab="${t[0]}" data-mid="${m.id}">${t[1]}${t[2]!=null?`<span class="c">${t[2]}</span>`:""}</button>`).join("")}</div>`

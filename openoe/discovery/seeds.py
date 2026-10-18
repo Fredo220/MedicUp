@@ -1,15 +1,20 @@
 """Seed parsing and resolution."""
 from __future__ import annotations
 
+import logging
+
 import re
 from typing import List, Tuple
 from urllib.parse import unquote, urlparse
 
 from openoe.discovery.models import Paper, paper_from_work
 from openoe.discovery.openalex import OpenAlexClient
+from openoe.discovery.pubmed import lookup_pubmed
 
 _DOI_RE = re.compile(r"10\.\d{4,9}/\S+", re.I)
 _TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
+
+log = logging.getLogger(__name__)
 
 
 def _clean_doi(value: str) -> str:
@@ -74,6 +79,11 @@ async def resolve_seeds(
         else:
             work = await client.get_work(value)
         paper = paper_from_work(work)
+        if paper is None and kind in ("doi", "pmid", "title"):
+            try:
+                paper = await lookup_pubmed(kind, value)
+            except Exception as exc:
+                log.warning("PubMed seed lookup failed for %r: %s", raw, type(exc).__name__)
         if paper is None or paper.openalex_id in seen_ids:
             unresolved.append(raw)
             continue

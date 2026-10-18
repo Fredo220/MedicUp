@@ -173,7 +173,7 @@ discovery_queries: |
   {seed_titles}
 
 discovery_judge: |
-  Judge how relevant this new paper is to the research question and seed papers.
+  Judge how relevant this new paper is to the research question and seed papers (if any are listed).
   Return JSON only with this exact shape:
   {{"relevance": 0, "why": "1-2 sentences tied to the question/seeds", "quote": "one verbatim sentence from the abstract that supports it, or empty", "related_seeds": ["S1"], "study_design": "unclear"}}
   Relevance must be an integer from 0 to 10. The quote must be copied verbatim from the abstract; if the abstract is empty, the quote must be empty. Use only seed labels shown below.

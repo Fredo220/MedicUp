@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from openoe.sources.openalex import _rebuild_abstract
 
@@ -36,9 +36,17 @@ class Paper(BaseModel):
 
 class DiscoverRequest(BaseModel):
     question: str = ""
-    seeds: List[str] = Field(min_length=1)
+    seeds: List[str] = Field(default_factory=list)
     disliked: List[str] = Field(default_factory=list)
     limit: int = 20
+
+    @model_validator(mode="after")
+    def _question_or_seeds(self) -> "DiscoverRequest":
+        self.question = self.question.strip()
+        self.seeds = [s.strip() for s in self.seeds if s and s.strip()]
+        if not self.question and not self.seeds:
+            raise ValueError("Enter a research question or at least one seed paper.")
+        return self
 
 
 class DiscoverResponse(BaseModel):

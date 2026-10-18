@@ -92,6 +92,9 @@ async def discover(
         for signal_type in {signal.get("type") for signal in candidate.get("signals", [])}:
             if signal_type:
                 stats["signals"][signal_type] = stats["signals"].get(signal_type, 0) + 1
+    if client.rate_limited:
+        errors = [e for e in errors if not e.startswith("OpenAlex GET")]
+        errors.insert(0, "OpenAlex daily limit reached (free tier, resets at midnight UTC) - searched PubMed instead")
     response = DiscoverResponse(
         seeds=[paper.to_api_dict() for paper in seeds],
         unresolved=unresolved,

@@ -15,9 +15,10 @@ from openoe.discovery.rank import (
 )
 from openoe.discovery.seeds import parse_seed
 from openoe.discovery.followup import _BARE_CITATION_RE as _FOLLOWUP_BARE_CITATION_RE
-from openoe.discovery.models import paper_from_work
+import pytest
+from openoe.discovery.models import DiscoverRequest, paper_from_work
 from openoe.discovery.openalex import SELECT_FIELDS, _describe_error
-from openoe.discovery.pubmed import parse_pubmed_abstracts
+from openoe.discovery.pubmed import parse_pubmed_abstracts, parse_pubmed_articles
 from openoe.pipeline.answer import _BARE_NUMERIC_CITATION_RE
 
 
@@ -226,3 +227,28 @@ def test_embedding_batches_preserve_order_with_concurrent_http_posts(monkeypatch
 
     assert embeddings == [[float(index)] for index in range(129)]
     assert 2 <= max_active_posts <= 4
+
+
+def test_discover_request_accepts_question_only_or_seeds_only():
+    assert DiscoverRequest(question="  melanoma immunotherapy  ").seeds == []
+    assert DiscoverRequest(seeds=["10.1056/NEJMoa1003466", " "]).seeds == ["10.1056/NEJMoa1003466"]
+    with pytest.raises(ValueError):
+        DiscoverRequest(question="  ", seeds=["", "  "])
+
+
+def test_pubmed_articles_become_papers_with_doi_year_and_links():
+    xml = """<PubmedArticleSet><PubmedArticle><MedlineCitation><PMID>123</PMID><Article>
+      <Journal><JournalIssue><PubDate><Year>2021</Year></PubDate></JournalIssue><Title>Lancet</Title></Journal>
+      <ArticleTitle>Adjuvant <i>pembrolizumab</i> in melanoma.</ArticleTitle>
+      <ELocationID EIdType="doi">10.1000/abc</ELocationID>
+      <Abstract><AbstractText Label="RESULTS">RFS improved.</AbstractText></Abstract>
+      <AuthorList><Author><LastName>Eggermont</LastName><Initials>A</Initials></Author></AuthorList>
+      <PublicationTypeList><PublicationType>Randomized Controlled Trial</PublicationType></PublicationTypeList>
+    </Article></MedlineCitation></PubmedArticle></PubmedArticleSet>"""
+    papers = parse_pubmed_articles(xml)
+    assert len(papers) == 1
+    paper = papers[0]
+    assert paper.openalex_id == "pmid:123" and paper.pmid == "123" and paper.doi == "10.1000/abc"
+    assert paper.title == "Adjuvant pembrolizumab in melanoma." and paper.year == 2021 and paper.venue == "Lancet"
+    assert paper.abstract == "RESULTS: RFS improved." and paper.authors == ["Eggermont A"]
+    assert paper.links["pubmed"] == "https://pubmed.ncbi.nlm.nih.gov/123/" and paper.links["doi"] == "https://doi.org/10.1000/abc"
