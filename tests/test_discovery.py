@@ -197,3 +197,24 @@ def test_openalex_source_raises_when_database_unavailable(monkeypatch):
     monkeypatch.setattr(src.asyncio, "sleep", no_sleep)
     with pytest.raises(RuntimeError, match="OpenAlex unavailable"):
         asyncio.run(src.OpenAlexSource().search(query="sglt2 hfpef", keywords=["sglt2 heart failure"]))
+
+
+def test_study_type_does_not_treat_methods_wording_as_sub_analysis():
+    from openoe.discovery.models import study_type
+    assert study_type("Randomized trial of X", "Participants were randomized according to study center.") == "RCT"
+
+
+def test_pick_title_match_demotes_editorial_with_exact_acronym_title():
+    from openoe.discovery.models import Paper
+    from openoe.discovery.seeds import pick_title_match
+    primary = Paper(openalex_id="W1", title="Empagliflozin in Heart Failure", abstract="EMPEROR-Preserved trial", cited_by_count=3000)
+    editorial = Paper(openalex_id="W2", title="EMPEROR-Preserved", type="editorial", cited_by_count=12)
+    assert pick_title_match("EMPEROR-Preserved", [editorial, primary]).openalex_id == "W1"
+
+
+def test_openalex_errors_do_not_leak_api_key():
+    import httpx
+    from openoe.sources.openalex import _safe_error
+    req = httpx.Request("GET", "https://api.openalex.org/works?api_key=SECRET123")
+    exc = httpx.HTTPStatusError("429 for https://api.openalex.org/works?api_key=SECRET123", request=req, response=httpx.Response(429, request=req))
+    assert "SECRET123" not in _safe_error(exc) and _safe_error(exc) == "HTTP 429"

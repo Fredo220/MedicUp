@@ -63,7 +63,7 @@ def pick_title_match(query: str, papers: List[Paper]) -> Optional[Paper]:
     if not wanted:
         return None
     best: Optional[Paper] = None
-    best_score = -1.0
+    best_score = float("-inf")
     normalized_query = " ".join(_tokens(query))
     for paper in papers:
         title_tokens = set(_tokens(paper.title))
@@ -73,7 +73,8 @@ def pick_title_match(query: str, papers: List[Paper]) -> Optional[Paper]:
             continue
         title_coverage = len(wanted & title_tokens) / len(wanted)
         exact = 3.0 if " ".join(_tokens(paper.title)) == normalized_query else 0.0
-        score = exact + coverage + title_coverage + 0.3 * math.log10(paper.cited_by_count + 1)
+        commentary = -10.0 if paper.type in {"editorial", "letter", "erratum"} else 0.0
+        score = exact + coverage + title_coverage + commentary + 0.3 * math.log10(paper.cited_by_count + 1)
         if score > best_score:
             best, best_score = paper, score
     return best

@@ -171,6 +171,8 @@ class Orchestrator:
             "papers_kept": len(ctx.filtered_papers), "total": len(ctx.merged_papers), "guidelines_kept": len(ctx.filtered_guidelines),
         })
 
+        ctx.filtered_papers = [d for d in ctx.filtered_papers if (d.content or "").strip()]
+        ctx.filtered_guidelines = [d for d in ctx.filtered_guidelines if d.relevant_chunks or (d.content or "").strip()]
         if not ctx.filtered_papers and not ctx.filtered_guidelines:
             return await self._no_sources_response(ctx, emit, t_total)
 

@@ -23,6 +23,13 @@ from openoe.utils.text import clean
 log = logging.getLogger(__name__)
 
 
+def _safe_error(exc: Exception) -> str:
+    """Error text without the request URL, which can contain the API key."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    return type(exc).__name__
+
+
 class OpenAlexSource:
     """Multi-strategy OpenAlex search: keyword + keyword + semantic."""
 
@@ -69,8 +76,8 @@ class OpenAlexSource:
                     log.info("OpenAlex [%s] %r → %d total, %d returned", label, search_q[:50], total, len(results))
                     return results
             except Exception as e:
-                log.warning("OpenAlex [%s] failed: %s", label, e)
-                errors.append(str(e))
+                log.warning("OpenAlex [%s] failed: %s", label, _safe_error(e))
+                errors.append(_safe_error(e))
                 return []
 
         async def _semantic_search(text: str, label: str) -> List[Dict]:
@@ -98,8 +105,8 @@ class OpenAlexSource:
                     log.info("OpenAlex [%s] semantic → %d returned", label, len(results))
                     return results
             except Exception as e:
-                log.warning("OpenAlex [%s] semantic failed: %s", label, e)
-                errors.append(str(e))
+                log.warning("OpenAlex [%s] semantic failed: %s", label, _safe_error(e))
+                errors.append(_safe_error(e))
                 return []
 
         # Run searches sequentially with 1s delay to respect rate limits

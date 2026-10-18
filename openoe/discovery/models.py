@@ -75,7 +75,8 @@ def study_type(title: str, abstract: str = "", work_type: Optional[str] = None) 
     if _has(r"pooled|patient-level|participant-level|individual patient data", t):
         return "Pooled analysis"
     randomized = _has(r"randomi[sz]ed|placebo-controlled", t + " " + a)
-    if randomized and _has(r"post[- ]hoc|prespecified|pre-specified|secondary analysis|subgroup|according to", t + " " + a):
+    sub_marker = r"post[- ]hoc|prespecified|pre-specified|secondary analysis|subgroup"
+    if randomized and (_has(sub_marker + r"|according to", t) or _has(sub_marker, a)):
         return "Trial sub-analysis"
     if randomized and work_type != "review":
         return "RCT"
