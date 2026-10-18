@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -58,12 +59,123 @@ class LLMResult:
     trace: LLMTrace
 
 
+class LLMError(RuntimeError):
+    """Safe, actionable provider failure shared by HTTP and WebSocket routes."""
+
+    def __init__(self, code: str, message: str, *, status_code: Optional[int] = None,
+                 retryable: bool = False, systemic: bool = True) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status_code = status_code
+        self.retryable = retryable
+        self.systemic = systemic
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"code": self.code, "message": str(self), "provider_status": self.status_code,
+                "retryable": self.retryable}
+
+
 class LLMClient:
     def __init__(self, cfg: Dict[str, Any]) -> None:
         self.cfg = cfg or {}
         retry = self.cfg.get("retry", {})
-        self._retries = int(retry.get("max_retries", 3))
+        self._retries = max(1, min(5, int(retry.get("max_retries", 3))))
         self._backoff = retry.get("backoff", [2, 4, 6])
+        self._permanent_errors: Dict[str, LLMError] = {}
+        self._failure_times: Dict[str, float] = {}
+        self._requests = asyncio.Semaphore(4)
+
+    def ensure_configured(self) -> None:
+        """Local configuration check, without inference or a network request."""
+        self._provider_settings()
+
+    def _provider_settings(self) -> tuple[str, str, str]:
+        provider = self.cfg.get("default_provider", "nebius")
+        config = self.cfg.get("providers", {}).get(provider, {})
+        base = str(config.get("base_url") or "").strip().rstrip("/")
+        key = str(config.get("api_key") or "").strip()
+        if len(key) > 1 and key[0] == key[-1] and key[0] in "\"'":
+            key = key[1:-1].strip()
+        if not key or key in {"your-token-factory-key", "your-nebius-api-key"}:
+            raise LLMError("missing_credentials",
+                           "Nebius Token Factory is not configured. Set NEBIUS_API_KEY or "
+                           "NEBIUS_API_KEY_FILE in the backend environment, then restart the app.")
+        if not base:
+            raise LLMError("missing_credentials", f"The {provider} provider URL is missing. Check the backend configuration and restart.")
+        return provider, base, key
+
+    def _http_error(self, response: httpx.Response, model: str) -> LLMError:
+        status = response.status_code
+        # Inspect provider error codes for classification, never expose raw response
+        # bodies: upstream errors may echo authorization or user data.
+        try:
+            detail = json.dumps(response.json()).lower()
+        except (ValueError, TypeError):
+            detail = ""
+        if status == 401:
+            return LLMError("authentication", "Nebius rejected the API key (HTTP 401). Check NEBIUS_API_KEY in the backend and restart.", status_code=status)
+        if status == 402 or (status == 429 and any(s in detail for s in ("insufficient_quota", "budget exhausted", "credit balance", "quota_exceeded"))):
+            return LLMError("quota_exceeded", "Nebius inference budget or credits are exhausted. Check the Token Factory project's billing and spending limits.", status_code=status)
+        if status == 403:
+            return LLMError("access_denied", "Nebius denied access (HTTP 403). Check the API key's project and model permissions.", status_code=status)
+        if status == 404:
+            return LLMError("model_unavailable", f"Nebius could not find configured model {model} (HTTP 404). Check the model ID available to this project.", status_code=status)
+        if status == 429:
+            return LLMError("rate_limited", "Nebius is rate limiting requests. Wait briefly and retry; check the project's request and token limits.", status_code=status, retryable=True)
+        if status in {408, 409, 425} or status >= 500:
+            return LLMError("unavailable", f"Nebius is temporarily unavailable (HTTP {status}). Retry shortly.", status_code=status, retryable=True)
+        return LLMError("invalid_request", f"Nebius rejected the model request (HTTP {status}). Check the configured model and request settings.", status_code=status)
+
+    async def _post(self, operation: str, body: Dict[str, Any], *, model: str) -> Dict[str, Any]:
+        _, base, key = self._provider_settings()
+        # Suppress the per-paper cascade, but allow recovery after billing or
+        # model access is repaired without poisoning this process forever.
+        for lookup, failed_at in list(self._failure_times.items()):
+            if time.monotonic() - failed_at >= 60:
+                self._permanent_errors.pop(lookup, None)
+                self._failure_times.pop(lookup, None)
+        for lookup in ("provider", f"model:{model}"):
+            if lookup in self._permanent_errors:
+                raise self._permanent_errors[lookup]
+        last_error = LLMError("unavailable", "Nebius did not return a response.", retryable=True)
+        for attempt in range(self._retries):
+            delay = self._delay(attempt)
+            async with self._requests:
+                # Another in-flight call may have established an auth/billing error.
+                for lookup in ("provider", f"model:{model}"):
+                    if lookup in self._permanent_errors:
+                        raise self._permanent_errors[lookup]
+                try:
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        response = await client.post(f"{base}/{operation}",
+                                                     headers={"Authorization": f"Bearer {key}"}, json=body)
+                    if response.is_error:
+                        last_error = self._http_error(response, model)
+                        if not last_error.retryable:
+                            scope = ("provider" if last_error.code in {"authentication", "access_denied", "quota_exceeded"}
+                                     else f"model:{model}" if last_error.code == "model_unavailable" else None)
+                            if scope:
+                                self._permanent_errors[scope] = last_error
+                                self._failure_times[scope] = time.monotonic()
+                            raise last_error
+                        try:
+                            delay = max(delay, min(30.0, float(response.headers.get("Retry-After", "0"))))
+                        except ValueError:
+                            pass
+                    else:
+                        try:
+                            data = response.json()
+                        except ValueError:
+                            raise LLMError("invalid_response", "Nebius returned invalid JSON. Retry this request.", systemic=False)
+                        if not isinstance(data, dict):
+                            raise LLMError("invalid_response", "Nebius returned an unexpected response format.", systemic=False)
+                        return data
+                except httpx.RequestError:
+                    last_error = LLMError("unavailable", "Cannot reach Nebius Token Factory. Check backend network access and NEBIUS_BASE_URL.", retryable=True)
+            log.warning("[LLM %s] attempt %d: %s", operation, attempt + 1, last_error.code)
+            if attempt + 1 < self._retries:
+                await asyncio.sleep(delay)
+        raise last_error
 
     async def chat(
         self,
@@ -85,12 +197,7 @@ class LLMClient:
                 For lightweight tasks (Y/N, keywords), use "low" to minimize reasoning overhead.
             provider: OpenRouter-only provider routing (e.g. "google-vertex").
         """
-        default_prov = self.cfg.get("default_provider", "nebius")
-        prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
-        base = str(prov_cfg.get("base_url", "")).rstrip("/")
-        key = prov_cfg.get("api_key", "")
-        if not base or not key:
-            raise RuntimeError(f"LLM provider '{default_prov}' missing base_url or api_key")
+        default_prov, _, _ = self._provider_settings()
 
         messages: List[Dict[str, str]] = [{"role": "system", "content": system}]
         if history:
@@ -109,103 +216,50 @@ class LLMClient:
                 body["reasoning"] = {"effort": reasoning_effort}
 
         t0 = time.perf_counter()
-        last_err = ""
-
-        for attempt in range(self._retries):
-            try:
-                async with httpx.AsyncClient(timeout=120.0) as c:
-                    r = await c.post(
-                        f"{base}/chat/completions",
-                        headers={"Authorization": f"Bearer {key}"},
-                        json=body,
-                    )
-                    r.raise_for_status()
-                    data = r.json()
-
-                elapsed = (time.perf_counter() - t0) * 1000
-
-                choice = data.get("choices", [{}])[0]
-                if choice.get("error"):
-                    last_err = str(choice["error"])
-                    log.warning("[LLM %s] attempt %d error: %s", step, attempt + 1, last_err)
-                    _dump(step, body, data, elapsed)
-                    if attempt < self._retries - 1:
-                        await asyncio.sleep(self._delay(attempt))
-                        continue
-                    raise RuntimeError(last_err)
-
-                content = (choice.get("message") or {}).get("content") or ""
-                content = content.strip()
-                if not content:
-                    last_err = "empty response"
-                    log.warning("[LLM %s] attempt %d empty | finish_reason=%s | model=%s",
-                                step, attempt + 1, choice.get("finish_reason"), data.get("model", model))
-                    _dump(step, body, data, elapsed)
-                    if attempt < self._retries - 1:
-                        await asyncio.sleep(self._delay(attempt))
-                        continue
-                    raise RuntimeError(last_err)
-
-                usage = data.get("usage", {})
-                ptok = usage.get("prompt_tokens", 0)
-                ctok = usage.get("completion_tokens", 0)
-                log.info("[LLM %s] OK %.0fms | %s via %s | %d+%d tok | %s",
-                         step, elapsed, model, provider or "auto", ptok, ctok,
-                         content[:60].replace("\n", " "))
-                _dump(step, body, data, elapsed)
-
-                trace = LLMTrace(
-                    step=step, model=model, provider=provider or default_prov,
-                    prompt_tokens=ptok, completion_tokens=ctok, latency_ms=elapsed,
-                )
-                return LLMResult(content=content, trace=trace)
-
-            except httpx.HTTPStatusError as e:
-                last_err = f"HTTP {e.response.status_code}: {e.response.text[:200]}"
-                log.warning("[LLM %s] attempt %d: %s", step, attempt + 1, last_err)
-            except Exception as e:
-                last_err = str(e)
-                log.warning("[LLM %s] attempt %d: %s", step, attempt + 1, last_err)
-
-            if attempt < self._retries - 1:
-                await asyncio.sleep(self._delay(attempt))
-
-        raise RuntimeError(f"LLM '{step}' failed after {self._retries} retries: {last_err}")
+        data = await self._post("chat/completions", body, model=model)
+        elapsed = (time.perf_counter() - t0) * 1000
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise LLMError("invalid_response", "Nebius returned no chat choices. Retry this request.", systemic=False)
+        choice = choices[0]
+        if choice.get("finish_reason") == "length":
+            raise LLMError("truncated_response", "The model response reached its token limit before completion. Reduce the input or increase the configured output limit.", systemic=False)
+        message = choice.get("message") or {}
+        if not isinstance(message, dict) or choice.get("error"):
+            raise LLMError("invalid_response", "Nebius returned an incomplete chat response.", systemic=False)
+        if message.get("refusal") or choice.get("finish_reason") == "content_filter":
+            raise LLMError("refused", "The model declined this request; no assessment was produced.", systemic=False)
+        content = message.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise LLMError("invalid_response", "Nebius returned an empty chat response; no assessment was produced.", systemic=False)
+        usage = data.get("usage") or {}
+        trace = LLMTrace(step=step, model=model, provider=provider or default_prov,
+                         prompt_tokens=usage.get("prompt_tokens", 0),
+                         completion_tokens=usage.get("completion_tokens", 0), latency_ms=elapsed)
+        log.info("[LLM %s] OK %.0fms | %s | %d+%d tok", step, elapsed, model,
+                 trace.prompt_tokens, trace.completion_tokens)
+        _dump(step, body, data, elapsed)
+        return LLMResult(content=content.strip(), trace=trace)
 
     async def embed(self, texts: List[str], model: str) -> List[List[float]]:
         """Create OpenAI-compatible embeddings in bounded batches."""
-        default_prov = self.cfg.get("default_provider", "nebius")
-        prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
-        base = str(prov_cfg.get("base_url", "")).rstrip("/")
-        key = prov_cfg.get("api_key", "")
-        if not base or not key:
-            raise RuntimeError(f"LLM provider '{default_prov}' missing base_url or api_key")
-        semaphore = asyncio.Semaphore(4)
+        self.ensure_configured()
 
         async def embed_batch(start: int, batch: List[str]) -> List[List[float]]:
-            last_err = ""
-            for attempt in range(self._retries):
-                try:
-                    async with semaphore:
-                        async with httpx.AsyncClient(timeout=120.0) as client:
-                            response = await client.post(
-                                f"{base}/embeddings",
-                                headers={"Authorization": f"Bearer {key}"},
-                                json={"model": model, "input": batch},
-                            )
-                            response.raise_for_status()
-                            data = response.json()
-                    indexed = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
-                    batch_vectors = [item.get("embedding", []) for item in indexed]
-                    if len(batch_vectors) != len(batch) or any(not vector for vector in batch_vectors):
-                        raise RuntimeError("embedding response did not match input batch")
-                    return batch_vectors
-                except Exception as exc:
-                    last_err = str(exc)
-                    log.warning("[LLM embeddings] batch %d attempt %d: %s", start // 32 + 1, attempt + 1, last_err)
-                    if attempt < self._retries - 1:
-                        await asyncio.sleep(self._delay(attempt))
-            raise RuntimeError(f"LLM embeddings failed after {self._retries} retries: {last_err}")
+            data = await self._post("embeddings", {"model": model, "input": batch,
+                                                  "encoding_format": "float"}, model=model)
+            items = data.get("data")
+            if (not isinstance(items, list) or len(items) != len(batch)
+                    or any(not isinstance(item, dict) or type(item.get("index")) is not int for item in items)
+                    or sorted(item["index"] for item in items) != list(range(len(batch)))):
+                raise LLMError("invalid_response", "Nebius embedding indices do not match the input batch.", systemic=False)
+            batch_vectors = [item.get("embedding") for item in sorted(items, key=lambda item: item["index"])]
+            if (any(not isinstance(vector, list) or not vector for vector in batch_vectors)
+                    or len({len(vector) for vector in batch_vectors}) != 1
+                    or any(type(value) not in (int, float) or not math.isfinite(value)
+                           for vector in batch_vectors for value in vector)):
+                raise LLMError("invalid_response", "Nebius returned invalid or inconsistent embedding vectors.", systemic=False)
+            return batch_vectors
 
         batches = [
             texts[start:start + 32]
@@ -215,7 +269,10 @@ class LLMClient:
             embed_batch(start, batch)
             for start, batch in zip(range(0, len(texts), 32), batches)
         ))
-        return [vector for batch_vectors in results for vector in batch_vectors]
+        vectors = [vector for batch_vectors in results for vector in batch_vectors]
+        if len({len(vector) for vector in vectors}) > 1:
+            raise LLMError("invalid_response", "Nebius embedding dimensions differ between batches.", systemic=False)
+        return vectors
 
     def _delay(self, attempt: int) -> float:
         return float(self._backoff[min(attempt, len(self._backoff) - 1)]) if self._backoff else 2.0

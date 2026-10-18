@@ -10,7 +10,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 from openoe.discovery.models import Paper
-from openoe.llm.client import LLMClient
+from openoe.llm.client import LLMClient, LLMError
 from openoe.llm.prompts import PromptManager
 
 log = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ def _cosine(left: List[float], right: List[float]) -> float:
 def _seed_link_count(signals: List[Dict[str, Any]]) -> int:
     linked: set[int] = set()
     for signal in signals:
-        if signal.get("type") in {"cited_by_seeds", "cites_seeds", "related"}:
+        if signal.get("type") in {"cited_by_seeds", "cites_seeds"}:
             linked.update(int(index) for index in signal.get("seeds", []))
     return len(linked)
 
@@ -160,8 +160,21 @@ async def rank_candidates(
     cfg: Dict[str, Any],
     limit: int = 20,
     progress: Any = None,
-) -> Tuple[List[Dict[str, Any]], int, List[str], Dict[str, float]]:
+) -> Tuple[List[Dict[str, Any]], int, List[str], Dict[str, float], List[Dict[str, Any]]]:
     timings: Dict[str, float] = {}
+    assessments: List[Dict[str, Any]] = []
+
+    def assessment(item: Dict[str, Any], status: str, reason: str) -> Dict[str, Any]:
+        return {"openalex_id": item["paper"].openalex_id, "title": item["paper"].title,
+                "assessment_status": status, "reason": reason}
+
+    eligible = []
+    for item in candidates:
+        if item["paper"].is_retracted:
+            assessments.append(assessment(item, "excluded", "Retracted publication."))
+        else:
+            eligible.append(item)
+    candidates = eligible
 
     async def notify(stage: str, message: str, detail: Dict[str, Any]) -> None:
         if progress:
@@ -177,7 +190,7 @@ async def rank_candidates(
         timings["rank"] = (time.perf_counter() - rank_started) * 1000
         await notify("judge", "Judging the highest-ranked candidates", {"n_judged": 0})
         timings["judge"] = 0.0
-        return [], 0, [], timings
+        return [], 0, [], timings, assessments
 
     texts = [_candidate_text(paper) for paper in seeds]
     texts.extend(_candidate_text(item["paper"]) for item in candidates)
@@ -193,10 +206,21 @@ async def rank_candidates(
     vectors: List[List[float]]
     try:
         vectors = await llm.embed(texts, cfg["embedding_model"])
+    except LLMError as exc:
+        if exc.systemic:
+            raise
+        errors.append(f"Embedding unavailable ({exc.code}); ranking stopped.")
+        assessments.extend(assessment(item, "unassessed", "Embedding stage unavailable.") for item in candidates)
+        timings["rank"] = (time.perf_counter() - rank_started) * 1000
+        timings["judge"] = 0.0
+        return [], 0, errors, timings, assessments
     except Exception as exc:
-        errors.append(f"Embedding: {exc}")
-        log.warning("Discovery embedding failed; using zero similarity: %s", exc)
-        vectors = [[] for _ in texts]
+        errors.append(f"Embedding unavailable ({type(exc).__name__}); ranking stopped.")
+        log.warning("Discovery embedding failed: %s", type(exc).__name__)
+        assessments.extend(assessment(item, "unassessed", "Embedding stage unavailable.") for item in candidates)
+        timings["rank"] = (time.perf_counter() - rank_started) * 1000
+        timings["judge"] = 0.0
+        return [], 0, errors, timings, assessments
 
     seed_vectors = vectors[:len(seeds)]
     candidate_start = len(seeds)
@@ -236,6 +260,7 @@ async def rank_candidates(
             len(signal_types), has_s2,
         )
         scored.append({
+            **{key: item[key] for key in ("metadata_sources", "metadata_conflicts") if key in item},
             "paper": item["paper"],
             "signals": signals,
             "similarity": similarities[index],
@@ -246,20 +271,21 @@ async def rank_candidates(
     scored.sort(key=lambda entry: entry["pre_score"], reverse=True)
     judge_k = int(cfg.get("judge_k", 25))
     to_judge = scored[:max(0, judge_k)]
+    assessments.extend(assessment(item, "unassessed", "Outside the configured judge budget.")
+                       for item in scored[len(to_judge):])
     timings["rank"] = (time.perf_counter() - rank_started) * 1000
     await notify("judge", "Judging the highest-ranked candidates", {"n_judged": len(to_judge)})
     seed_titles = "\n".join(f"S{index + 1}: {paper.title}" for index, paper in enumerate(seeds)) or "(none — judge against the research question only; related_seeds must be [])"
     semaphore = asyncio.Semaphore(10)
     judge_started = time.perf_counter()
+    judge_model = cfg.get("judge_model") or cfg.get("strong_model") or cfg["small_model"]
+    min_relevance = max(1, min(10, int(cfg.get("min_relevance", 1))))
 
     async def judge(entry: Dict[str, Any]) -> Dict[str, Any]:
         paper: Paper = entry["paper"]
         fallback = {
-            "relevance": 0,
-            "why": "",
-            "quote": "",
-            "related_seeds": [],
-            "study_design": "unclear",
+            "assessment_status": "unassessed",
+            "reason": "Relevance assessment unavailable.",
         }
         prompt = prompts.render(
             "discovery_judge",
@@ -275,15 +301,26 @@ async def rank_candidates(
                     step="discovery_judge",
                     prompt=prompt,
                     system="Return only the requested JSON object.",
-                    model=cfg["small_model"],
+                    model=judge_model,
                     max_tokens=900,
                     reasoning_effort="low",
                 )
                 parsed = parse_judge_json(response.content)
-                relevance = max(0, min(10, int(float(parsed.get("relevance", 0)))))
-                why = str(parsed.get("why") or "")
+                raw_relevance = parsed.get("relevance")
+                if isinstance(raw_relevance, bool) or not isinstance(raw_relevance, (int, float)):
+                    raise ValueError("relevance must be an integer from 0 to 10")
+                if raw_relevance not in range(11):
+                    raise ValueError("relevance must be an integer from 0 to 10")
+                relevance = int(raw_relevance)
+                why = str(parsed.get("why") or "").strip()
+                if relevance >= min_relevance and not why:
+                    raise ValueError("relevant recommendations require an explanation")
                 quote = str(parsed.get("quote") or "")
+                if quote and not verify_quote(quote, paper.abstract):
+                    raise ValueError("supporting quote is not present in the candidate abstract")
                 raw_related = parsed.get("related_seeds") or []
+                if not isinstance(raw_related, list):
+                    raise ValueError("related_seeds must be a list")
                 related = []
                 for seed_ref in raw_related:
                     match = re.fullmatch(r"\s*S(\d+)\s*", str(seed_ref), flags=re.I)
@@ -292,25 +329,49 @@ async def rank_candidates(
                         if 0 <= index < len(seeds) and index not in related:
                             related.append(index)
                 return {
+                    "assessment_status": "assessed",
                     "relevance": relevance,
                     "why": why,
                     "quote": quote,
                     "related_seeds": related,
                     "study_design": parsed["study_design"],
                 }
+            except LLMError as exc:
+                if exc.systemic:
+                    raise
+                errors.append(f"Judge {paper.openalex_id}: assessment unavailable ({exc.code}).")
+                return fallback
             except Exception as exc:
-                log.warning("Discovery judge failed for %s: %s", paper.openalex_id, exc)
-                errors.append(f"Judge {paper.openalex_id}: {exc}")
+                log.warning("Discovery judge failed for %s: %s", paper.openalex_id, type(exc).__name__)
+                errors.append(f"Judge {paper.openalex_id}: assessment unavailable ({type(exc).__name__}).")
                 return fallback
 
-    judged_values = await asyncio.gather(*(judge(entry) for entry in to_judge))
+    tasks = [asyncio.create_task(judge(entry)) for entry in to_judge]
+    try:
+        judged_values = await asyncio.gather(*tasks)
+    except LLMError:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     timings["judge"] = (time.perf_counter() - judge_started) * 1000
     results = []
     for entry, judged in zip(to_judge, judged_values):
         paper: Paper = entry["paper"]
+        if judged["assessment_status"] != "assessed":
+            assessments.append(assessment(entry, "unassessed", judged["reason"]))
+            continue
+        if judged["relevance"] < min_relevance:
+            assessments.append(assessment(entry, "excluded", "Below the configured relevance gate."))
+            continue
+        assessments.append(assessment(entry, "assessed", "Passed the relevance gate."))
         final_score = calculate_final_score(judged["relevance"], entry["pre_score"])
         results.append({
             **paper.to_api_dict(),
+            **{key: entry[key] for key in ("metadata_sources", "metadata_conflicts") if key in entry},
+            "assessment_status": "assessed",
+            "judge_model": judge_model,
             "score": final_score,
             "score_pct": score_to_pct(final_score),
             "components": {
@@ -333,4 +394,4 @@ async def rank_candidates(
     results = results[:max(0, limit)]
     for rank, item in enumerate(results, 1):
         item["rank"] = rank
-    return results, len(to_judge), errors, timings
+    return results, len(to_judge), errors, timings, assessments

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from copy import deepcopy
 from importlib import resources
 from pathlib import Path
@@ -21,9 +22,24 @@ def _load_dotenv() -> None:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
+                if line.startswith("export "):
+                    line = line[7:].lstrip()
                 key, _, val = line.partition("=")
-                os.environ.setdefault(key.strip(), val.strip())
+                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key.strip()):
+                    continue
+                parts = shlex.split(val, comments=True)
+                os.environ.setdefault(key.strip(), " ".join(parts))
             break
+    for name in ("NEBIUS_API_KEY", "TAVILY_API_KEY", "OPENALEX_API_KEY"):
+        path = os.getenv(f"{name}_FILE")
+        if path and not os.getenv(name):
+            try:
+                value = Path(path).expanduser().read_text("utf-8").strip()
+            except OSError:
+                raise ValueError(f"Cannot read {name}_FILE. Check the backend secret mount and permissions.") from None
+            if "\n" in value or "\r" in value:
+                raise ValueError(f"{name}_FILE must contain a single API key.")
+            os.environ[name] = value
 
 
 def _expand_env(text: str) -> str:
@@ -38,7 +54,15 @@ def load_config(path: Optional[str] = None, *, default: str = "pipeline.yaml") -
         raw = p.read_text("utf-8") if p.exists() else resources.files("openoe.config").joinpath(path).read_text("utf-8")
     else:
         raw = resources.files("openoe.config").joinpath(default).read_text("utf-8")
-    cfg = yaml.safe_load(_expand_env(raw)) or {}
+    def expand(value: Any) -> Any:
+        if isinstance(value, str):
+            return _expand_env(value)
+        if isinstance(value, dict):
+            return {key: expand(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [expand(item) for item in value]
+        return value
+    cfg = expand(yaml.safe_load(raw) or {})
     cfg.setdefault("retrieval", {"routes": {}})
     cfg.setdefault("stages", {})
     cfg.setdefault("merge", {})

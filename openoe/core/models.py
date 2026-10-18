@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from openoe.core.trace import ExecutionTrace
 
@@ -89,6 +89,13 @@ class QueryRequest(BaseModel):
     filters: Dict[str, Any] = Field(default_factory=dict)
     history: List[Dict[str, str]] = Field(default_factory=list)
     config_overrides: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("config_overrides")
+    @classmethod
+    def no_server_overrides(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        if value:
+            raise ValueError("Server configuration cannot be changed through a search request.")
+        return value
 
 
 class QueryResponse(BaseModel):

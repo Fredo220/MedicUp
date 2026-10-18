@@ -6,12 +6,48 @@ import logging
 import re
 from typing import Any, Dict, List
 
-from openoe.llm.client import LLMClient
+from openoe.llm.client import LLMClient, LLMError
 from openoe.llm.prompts import PromptManager
 
 _BARE_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 _FOOTNOTE_RE = re.compile(r"\[\^(\d+)\]")
 log = logging.getLogger(__name__)
+
+
+def _eligible_evidence(paper: Dict[str, Any]) -> bool:
+    decision = str(paper.get("decision") or "").casefold()
+    return not (
+        paper.get("is_retracted") is True
+        or str(paper.get("flag") or "").casefold() == "retracted"
+        or decision in {"r", "rej", "reject", "rejected"}
+        or paper.get("rejected") is True
+        or paper.get("assessment_status") in {"unassessed", "excluded"}
+    )
+
+
+def _cited_passages(text: str, allowed: set[int]) -> tuple[str, int]:
+    """Keep only passages whose citations resolve to the current evidence set.
+
+    This checks citation membership, not whether a source entails a claim. Never
+    turn an unknown citation into an uncited claim by deleting only its marker.
+    """
+    # Models sometimes place a footnote immediately after sentence punctuation.
+    text = re.sub(r"([.!?])\s*((?:\[\^\d+\]\s*)+)",
+                  lambda m: " " + m.group(2).strip() + m.group(1) + " ", text.strip())
+    units = re.split(r"(?<=[.!?])\s+|\n+", text)
+    kept = []
+    removed = 0
+    for unit in units:
+        unit = unit.strip()
+        if not unit:
+            continue
+        refs = {int(value) for value in _FOOTNOTE_RE.findall(unit)}
+        has_claim_text = re.search(r"[A-Za-z]", _FOOTNOTE_RE.sub("", unit))
+        if not refs or not refs <= allowed or _BARE_CITATION_RE.search(unit) or not has_claim_text:
+            removed += 1
+            continue
+        kept.append(unit)
+    return " ".join(kept), removed
 
 
 async def suggest_followups(
@@ -39,6 +75,11 @@ async def suggest_followups(
         match = re.search(r"\[[\s\S]*?\]", response.content)
         items = json.loads(match.group(0)) if match else []
         return [str(item).strip() for item in items if str(item).strip()][:3]
+    except LLMError as exc:
+        if exc.systemic:
+            raise
+        log.warning("Follow-up suggestions failed: %s", exc.code)
+        return []
     except Exception as exc:
         log.warning("Follow-up suggestions failed: %s", type(exc).__name__)
         return []
@@ -55,7 +96,14 @@ async def answer_followup(
     numbered = []
     by_number: Dict[int, Dict[str, Any]] = {}
     for index, paper in enumerate(papers, 1):
-        number = int(paper.get("n", index))
+        if not _eligible_evidence(paper):
+            continue
+        try:
+            number = int(paper.get("n", index))
+        except (ValueError, TypeError):
+            continue
+        if number < 1 or number in by_number:
+            continue
         by_number[number] = paper
         numbered.append({
             "n": number,
@@ -65,6 +113,12 @@ async def answer_followup(
             "openalex_id": paper.get("openalex_id"),
             "links": paper.get("links", {}),
         })
+    if not numbered:
+        return {
+            "answer": "There are no eligible papers available to answer this question.",
+            "citations": [], "suggestions": [],
+            "assessment_status": "no_eligible_evidence", "errors": [],
+        }
     response = await llm.chat(
         step="discovery_followup",
         prompt=prompts.render(
@@ -77,7 +131,14 @@ async def answer_followup(
         max_tokens=1200,
         history=history,
     )
-    answer = _BARE_CITATION_RE.sub("", response.content.strip())
+    answer, removed = _cited_passages(response.content, set(by_number))
+    errors = ["Some passages were omitted because their citations were missing or invalid."] if removed else []
+    if not answer:
+        return {
+            "answer": "The supplied papers did not yield an answer with valid source citations.",
+            "citations": [], "suggestions": [], "errors": errors,
+            "assessment_status": "insufficient_cited_evidence",
+        }
     cited_numbers = []
     for value in _FOOTNOTE_RE.findall(answer):
         number = int(value)
@@ -96,4 +157,6 @@ async def answer_followup(
     suggestions = await suggest_followups(
         llm, prompts, cfg, question, answer, [item["title"] for item in numbered],
     )
-    return {"answer": answer, "citations": citations, "suggestions": suggestions}
+    return {"answer": answer, "citations": citations, "suggestions": suggestions,
+            "assessment_status": "answered", "citation_validation": "source_membership_only",
+            "errors": errors}

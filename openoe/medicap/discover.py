@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Set
 import httpx
 
 from openoe.medicap.openalex import OpenAlex, short_id, to_paper
+from openoe.llm.client import LLMError
 from openoe.pipeline.web_context import add_supporting_sources, question_context
 from openoe.sources.tavily import clean_title, extract_ids, tavily_search
 
@@ -161,14 +162,18 @@ def _rank(order: List[str], pid: str) -> Optional[int]:
 # ── LLM judge ────────────────────────────────────────────────────────────────
 
 def llm_available(cfg: Dict[str, Any]) -> bool:
-    prov = cfg.get("llm", {}).get("providers", {}).get(cfg.get("llm", {}).get("default_provider", "openrouter"), {})
+    prov = cfg.get("llm", {}).get("providers", {}).get(cfg.get("llm", {}).get("default_provider", "nebius"), {})
     return bool(prov.get("api_key") and prov.get("base_url"))
 
 
-async def _judge(llm, cfg, question: str, seed_titles: List[str], papers: List[Dict]) -> Dict[str, float]:
+async def _judge(llm, cfg, question: str, seed_titles: List[str], papers: List[Dict]):
     jc = cfg.get("stages", {}).get("filter", {}).get("paper_relevance", {})
     sem = asyncio.Semaphore(int(jc.get("concurrency", 10)))
     seeds_txt = "\n".join(f"- {t}" for t in seed_titles)
+    discovery_cfg = cfg.get("discovery", {})
+    model = (discovery_cfg.get("judge_model") or discovery_cfg.get("strong_model")
+             or jc.get("model") or "Qwen/Qwen3-235B-A22B-Instruct-2507")
+    errors = []
 
     async def _one(p: Dict) -> Optional[float]:
         prompt = (f"Research question: {question}\nSeed papers the researcher trusts:\n{seeds_txt}\n\n"
@@ -176,16 +181,32 @@ async def _judge(llm, cfg, question: str, seed_titles: List[str], papers: List[D
                   "How relevant is the candidate to the question and seeds? Reply with only an integer 0-100.")
         async with sem:
             try:
-                r = await llm.chat(step="medicap_judge", prompt=prompt, model=jc.get("model", "openai/gpt-oss-20b"),
+                r = await llm.chat(step="medicap_judge", prompt=prompt, model=model,
                                    provider=jc.get("provider"), max_tokens=1024, reasoning_effort="low")
-                m = re.search(r"\d{1,3}", r.content)
-                return min(100, int(m.group())) / 100 if m else None
-            except Exception as e:
-                log.warning("Judge failed for %s: %s", p["id"], e)
+                text = r.content.strip()
+                if not re.fullmatch(r"\d{1,3}", text) or int(text) > 100:
+                    raise ValueError("judge did not return an integer from 0 to 100")
+                return int(text) / 100
+            except LLMError as exc:
+                if exc.systemic:
+                    raise
+                errors.append(f"Judge {p['id']}: assessment unavailable ({exc.code}).")
+                return None
+            except Exception as exc:
+                log.warning("Judge failed for %s: %s", p["id"], type(exc).__name__)
+                errors.append(f"Judge {p['id']}: assessment unavailable ({type(exc).__name__}).")
                 return None
 
-    res = await asyncio.gather(*[_one(p) for p in papers])
-    return {p["id"]: v for p, v in zip(papers, res) if v is not None}
+    tasks = [asyncio.create_task(_one(p)) for p in papers]
+    try:
+        res = await asyncio.gather(*tasks)
+    except LLMError:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+    return {p["id"]: v for p, v in zip(papers, res) if v is not None}, errors
 
 
 # ── Discovery ────────────────────────────────────────────────────────────────
@@ -286,12 +307,39 @@ async def discover(question: str, seed_ids: List[str], cfg: Dict[str, Any], llm=
 
     judge_on = llm is not None and llm_available(cfg)
     l: Dict[str, float] = {}
+    errors: List[str] = []
+    assessments: List[Dict[str, Any]] = []
+    pre: List[str] = []
+    discovery_cfg = cfg.get("discovery", {})
+    min_relevance = max(1, min(10, int(discovery_cfg.get("min_relevance", 1)))) / 10
     if judge_on:
-        pre = sorted(cands, key=lambda k: -combine(g.get(k, 0), s.get(k, 0), None))[:30]
-        l = await _judge(llm, cfg, question, [pool[x]["t"] for x in seeds], [pool[k] for k in pre])
+        eligible = [k for k in cands if pool[k].get("flag") != "retracted"]
+        judge_k = max(0, int(discovery_cfg.get("judge_k", 30)))
+        pre = sorted(eligible, key=lambda k: -combine(g.get(k, 0), s.get(k, 0), None))[:judge_k]
+        l, judge_errors = await _judge(llm, cfg, question, [pool[x]["t"] for x in seeds], [pool[k] for k in pre])
+        errors.extend(judge_errors)
+    elif cands:
+        errors.append("Relevance assessment is not configured; these are unassessed retrieval candidates.")
 
     out = []
     for k in cands:
+        status = "assessed" if k in l else "unassessed"
+        reason = "Passed the relevance gate."
+        if pool[k].get("flag") == "retracted":
+            status, reason = "excluded", "Retracted publication."
+        elif judge_on and k not in l:
+            reason = "Assessment unavailable." if k in pre else "Outside the configured judge budget."
+        elif k in l and l[k] < min_relevance:
+            status, reason = "excluded", "Below the configured relevance gate."
+        elif not judge_on:
+            reason = "Relevance assessment is not configured."
+        assessments.append({"id": k, "title": pool[k]["t"],
+                            "assessment_status": status, "reason": reason})
+        # A missing assessment is never a stronger relevance signal. Keep a
+        # single assessed cohort when judging is enabled, rather than mixing
+        # different denominators in the final ranking.
+        if status == "excluded" or (judge_on and status != "assessed"):
+            continue
         ev = g_ev[k]
         ch = []
         if ev["direct"] or any(n >= 3 for n in ev["shared"].values()):
@@ -307,7 +355,7 @@ async def discover(question: str, seed_ids: List[str], cfg: Dict[str, Any], llm=
         p = pool[k]
         lk = links.get(k, {})
         out.append({**{x: p[x] for x in ("id", "t", "au", "y", "v", "type", "peer", "oa", "cit", "doi", "pmid", "url", "flag", "topic")},
-                    "abstract": p["abstract"][:600],
+                    "abstract": p["abstract"], "assessment_status": status,
                     "g": round(g.get(k, 0), 4), "s": round(s.get(k, 0), 4),
                     "l": round(l[k], 4) if k in l else None, "ch": ch,
                     "sl": sorted({i + 1 for i in ev["direct"]} | {i + 1 for i, n in ev["shared"].items() if n >= 3}),
@@ -338,7 +386,13 @@ async def discover(question: str, seed_ids: List[str], cfg: Dict[str, Any], llm=
         for t in targets:
             t["_p"]["web"] = t.get("supporting_sources", [])
 
-    loo = _loo(pool, seeds, links, kw_ids, web_ids, sem, l)
+    # The former full-pool re-ranking leaked every held-out seed into retrieval
+    # and reused judgments that had seen its title. Do not publish it as recall.
+    # Valid LOO requires a separately budgeted retrieval/judging run per seed.
+    loo_status = {
+        "status": "unavailable",
+        "reason": "A valid leave-one-out evaluation requires separate retrieval and judging for each held-out seed; no evaluation was run.",
+    }
     seed_list = [{"n": i + 1, **_brief(pool[s]), "flag": pool[s]["flag"], "topic": pool[s]["topic"]}
                  for i, s in enumerate(seeds)]
     queries = [{"channel": "graph", "q": f"references + citing works of {len(seeds)} seeds"}]
@@ -349,33 +403,14 @@ async def discover(question: str, seed_ids: List[str], cfg: Dict[str, Any], llm=
         "seeds": seed_list,
         "papers": out,
         "clusters": clusters,
-        "loo": loo,
+        "loo": [], "loo_status": loo_status,
+        "assessments": assessments, "errors": errors,
         "queries": queries,
         "web_context": web_ctx or {},
         "judge": judge_on,
         "stats": {"seeds": len(seeds), "graph_candidates": len(links), "keyword_hits": len(kw_ids),
                   "web_hits": len(web), "pool": len(pool), "returned": len(out), "judged": len(l),
-                  "papers_with_supporting_sources": supported},
+                  "papers_with_supporting_sources": supported,
+                  "unassessed": sum(a["assessment_status"] == "unassessed" for a in assessments),
+                  "excluded": sum(a["assessment_status"] == "excluded" for a in assessments)},
     }
-
-
-def _loo(pool, seeds, links, kw_ids, web_ids, sem, l) -> List[Dict[str, Any]]:
-    """Leave-one-out: hide each seed, rank the pool with the others, record where the hidden seed lands."""
-    rows = []
-    for h, hid in enumerate(seeds):
-        use = set(range(len(seeds))) - {h}
-        others = {seeds[i] for i in use}
-        cands = [k for k in pool if k not in others]
-        g_ev = _graph(pool, seeds, links, use)
-        g = _norm({k: g_ev[k]["raw"] for k in cands})
-        s = _norm({k: v for k, v in sem(use).items() if k in cands})
-        graph_order = [k for k in sorted(cands, key=lambda k: -g[k]) if g[k] > 0]
-        sem_order = sorted(cands, key=lambda k: -s.get(k, 0))
-        hyb_order = sorted(cands, key=lambda k: -combine(g.get(k, 0), s.get(k, 0), l.get(k)))
-        rows.append({"seed": h + 1,
-                     "keyword": _rank([k for k in kw_ids if k not in others], hid),
-                     "web": _rank([k for k in web_ids if k not in others], hid),
-                     "graph": _rank(graph_order, hid),
-                     "semantic": _rank(sem_order, hid),
-                     "hybrid": _rank(hyb_order, hid)})
-    return rows

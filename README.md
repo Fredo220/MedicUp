@@ -178,3 +178,16 @@ openoe/
 Built on [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) by wizardlancet (MIT). Data from [OpenAlex](https://openalex.org), [PubMed](https://pubmed.ncbi.nlm.nih.gov), [Semantic Scholar](https://www.semanticscholar.org) and [Tavily](https://www.tavily.com). Models served by [Nebius Token Factory](https://tokenfactory.nebius.com).
 
 MIT License. MedicUp is a research tool: it can make mistakes, check the sources, and it is not a substitute for clinical judgement.
+
+
+## Reliability fixes
+
+- Discovery now reports the underlying Nebius configuration, authentication, permission, credit, model or rate-limit failure instead of repeating it for query generation, embeddings and every paper. Permanent failures stop promptly; transient failures use bounded retries and concurrency.
+- Quoted/exported `.env` credentials and private `NEBIUS_API_KEY_FILE` / `TAVILY_API_KEY_FILE` mounts are supported. Configure the backend keys and restart; local configuration checks do not verify available credits or live inference.
+- Seed title matching is validated, up to 50 seed lines are accepted explicitly, and PMID/DOI/OpenAlex aliases are used consistently for exclusions. Candidate admission and metadata merging are deterministic rather than dependent on response timing.
+- Failed or out-of-budget judgments no longer become ordinary scored recommendations. Successful recommendations must pass the relevance gate, have an explanation, and not be retracted. The judge uses the strong model by default; `MEDICUP_JUDGE_MODEL` can override it. Match percentages remain heuristic scores.
+- Evidence synthesis excludes supplied retraction/rejection flags and validates citation numbers while preserving original numbering. Citation membership checks do not establish claim entailment.
+- The invalid full-pool leave-one-out calculation is disabled: the backend reports evaluation as unavailable until independent retrieval/judging is run for each held-out seed. The unchanged dashboard may display 0% for that empty evaluation; it is not a measured score. No discovery-recall result is claimed.
+- Public configuration mutation and per-request server configuration overrides are disabled. The existing interface, graph presentation, and navigation remain unchanged.
+
+Regression tests cover these backend failure paths with local fixtures. Live provider operation and Nebius deployment still require separately configured server credentials.

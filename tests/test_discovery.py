@@ -180,6 +180,8 @@ def test_embedding_batches_preserve_order_with_concurrent_http_posts(monkeypatch
     max_active_posts = 0
 
     class StubResponse:
+        is_error = False
+
         def __init__(self, data):
             self.data = data
 

@@ -89,6 +89,9 @@ stages:
     system_prompt: medical_expert
 
 discovery:
+  tavily_api_key: "${TAVILY_API_KEY:}"
+  judge_model: "${MEDICUP_JUDGE_MODEL:}"
+  min_relevance: 1
   small_model: "${MEDICUP_SMALL_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}"
   strong_model: "${MEDICUP_STRONG_MODEL:Qwen/Qwen3-235B-A22B-Instruct-2507}"
   embedding_model: "${MEDICUP_EMBED_MODEL:Qwen/Qwen3-Embedding-8B}"

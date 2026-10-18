@@ -47,6 +47,7 @@ class Orchestrator:
         return self.trace_store.get(trace_id)
 
     async def run(self, req: QueryRequest, progress: Optional[ProgressFn] = None) -> QueryResponse:
+        self.llm.ensure_configured()
         emit = progress or _noop_progress
         cfg = apply_overrides(self.config, req.config_overrides)
         stages = cfg.get("stages", {})

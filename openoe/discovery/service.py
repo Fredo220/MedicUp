@@ -24,6 +24,8 @@ async def discover(
 ) -> Dict[str, Any]:
     if llm is None or prompts is None or cfg is None:
         raise ValueError("discover requires configured llm, prompts, and discovery config")
+    if isinstance(llm, LLMClient):
+        llm.ensure_configured()
     timings: Dict[str, float] = {}
     errors: List[str] = []
 
@@ -40,7 +42,7 @@ async def discover(
         email=openalex_cfg.get("email", ""),
         api_key=openalex_cfg.get("api_key"),
     )
-    await notify("seeds", "Resolving seed papers", {"n_seeds": min(len(req.seeds), 10)})
+    await notify("seeds", "Resolving seed papers", {"n_seeds": len(req.seeds)})
     seeds, unresolved = await resolve_seeds(req.seeds, client)
     timings["seeds"] = (time.perf_counter() - started) * 1000
 
@@ -75,7 +77,7 @@ async def discover(
             if not paper.abstract and paper.pmid and pubmed_abstracts.get(paper.pmid):
                 paper.abstract = pubmed_abstracts[paper.pmid]
 
-    results, n_judged, rank_errors, rank_timings = await rank_candidates(
+    results, n_judged, rank_errors, rank_timings, assessments = await rank_candidates(
         question=req.question,
         seeds=seeds,
         candidates=candidates,
@@ -87,7 +89,9 @@ async def discover(
     )
     errors.extend(rank_errors)
     timings.update(rank_timings)
-    stats: Dict[str, Any] = {"signals": {}, "n_candidates": len(candidates), "n_judged": n_judged}
+    stats: Dict[str, Any] = {"signals": {}, "n_candidates": len(candidates), "n_judged": n_judged,
+                             "assessments": assessments,
+                             "n_assessed": sum(row.get("assessment_status") == "assessed" for row in assessments)}
     for candidate in candidates:
         for signal_type in {signal.get("type") for signal in candidate.get("signals", [])}:
             if signal_type:

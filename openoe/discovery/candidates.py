@@ -14,7 +14,7 @@ from openoe.discovery.models import Paper, normalize_doi, paper_from_work, short
 from openoe.discovery.openalex import OpenAlexClient
 from openoe.discovery.pubmed import lookup_pubmed, search_pubmed
 from openoe.discovery.seeds import parse_seed
-from openoe.llm.client import LLMClient
+from openoe.llm.client import LLMClient, LLMError
 from openoe.llm.prompts import PromptManager
 
 log = logging.getLogger(__name__)
@@ -47,6 +47,110 @@ def _extract_json_list(text: str) -> List[str]:
     return [item.strip() for item in value if isinstance(item, str) and item.strip()][:2]
 
 
+def _admission_order(record: Dict[str, Any]) -> tuple:
+    """Bound the complete fused pool deterministically before expensive ranking."""
+    signals = record["signals"]
+    linked_seeds = {
+        index for signal in signals
+        if signal.get("type") in {"cited_by_seeds", "cites_seeds", "related"}
+        for index in signal.get("seeds", [])
+    }
+    types = {signal.get("type") for signal in signals}
+    recommendation_rank = min(
+        (signal.get("rank", 41) for signal in signals if signal.get("type") == "s2_recommendation"),
+        default=41,
+    )
+    return -len(linked_seeds), -len(types), recommendation_rank, record["paper"].openalex_id
+
+
+def _paper_aliases(paper: Paper) -> Set[str]:
+    aliases = {"id:" + paper.openalex_id}
+    doi = normalize_doi(paper.doi)
+    if doi:
+        aliases.add("doi:" + doi.casefold())
+    if paper.pmid:
+        aliases.add("pmid:" + paper.pmid)
+    if paper.openalex_id.startswith("pmid:"):
+        aliases.add(paper.openalex_id)
+    return aliases
+
+
+def _merge_metadata(papers: List[Paper]) -> Tuple[Paper, Dict[str, Any]]:
+    # Prefer an actual OpenAlex identity; sort all remaining ties rather than
+    # letting the first HTTP response choose the publication's metadata.
+    ordered = sorted(papers, key=lambda paper: (
+        not bool(re.fullmatch(r"W\d+", paper.openalex_id)),
+        paper.openalex_id,
+        json.dumps(paper.to_api_dict(), sort_keys=True),
+    ))
+    updates: Dict[str, Any] = {}
+    conflicts: Dict[str, Any] = {}
+    for field in ("doi", "pmid", "title", "year", "venue", "topic", "field", "type", "oa_url"):
+        values = [getattr(paper, field) for paper in ordered if getattr(paper, field) not in (None, "")]
+        if field == "doi":
+            values = [normalize_doi(value) for value in values]
+        if values:
+            updates[field] = values[0]
+            distinct = {json.dumps(value, sort_keys=True): value for value in values}
+            if len(distinct) > 1:
+                conflicts[field] = [distinct[key] for key in sorted(distinct)]
+    updates["abstract"] = max((paper.abstract for paper in ordered), key=lambda value: (len(value), value))
+    updates["authors"] = max((paper.authors for paper in ordered), key=lambda value: (len(value), tuple(value)))
+    citation_counts = [paper.cited_by_count for paper in ordered if paper.cited_by_count is not None]
+    updates["cited_by_count"] = max(citation_counts, default=None)
+    oa_status = [paper.is_oa for paper in ordered if paper.is_oa is not None]
+    updates["is_oa"] = any(oa_status) if oa_status else None
+    # A sparse or older provider record must never erase a retraction warning.
+    updates["is_retracted"] = any(paper.is_retracted for paper in ordered)
+    updates["links"] = {
+        key: next((paper.links[key] for paper in ordered if paper.links.get(key)), None)
+        for key in sorted({key for paper in ordered for key in paper.links})
+    }
+    for field in ("referenced_works", "related_works"):
+        updates[field] = sorted({wid for paper in ordered for wid in getattr(paper, field)})
+    return ordered[0].model_copy(update=updates), conflicts
+
+
+def _fuse_candidates(
+    entries: List[Tuple[Paper, Dict[str, Any]]], excluded_aliases: Set[str],
+) -> List[Dict[str, Any]]:
+    """Unify transitive identifiers before exclusions, metadata merging or caps."""
+    parents = list(range(len(entries)))
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    by_alias: Dict[str, int] = {}
+    for index, (paper, _) in enumerate(entries):
+        for alias in _paper_aliases(paper):
+            if alias in by_alias:
+                parents[find(index)] = find(by_alias[alias])
+            else:
+                by_alias[alias] = index
+    groups: Dict[int, List[Tuple[Paper, Dict[str, Any]]]] = {}
+    for index, entry in enumerate(entries):
+        groups.setdefault(find(index), []).append(entry)
+
+    fused = []
+    for group in groups.values():
+        papers = [paper for paper, _ in group]
+        aliases = {alias for paper in papers for alias in _paper_aliases(paper)}
+        if aliases & excluded_aliases:
+            continue
+        paper, conflicts = _merge_metadata(papers)
+        signals = {json.dumps(signal, sort_keys=True): signal for _, signal in group}
+        fused.append({
+            "paper": paper,
+            "signals": [signals[key] for key in sorted(signals)],
+            "metadata_sources": sorted({"pubmed" if item.openalex_id.startswith("pmid:") else "openalex" for item in papers}),
+            "metadata_conflicts": conflicts,
+        })
+    return sorted(fused, key=_admission_order)[:200]
+
+
 async def gather_candidates(
     question: str,
     seeds: List[Paper],
@@ -58,45 +162,20 @@ async def gather_candidates(
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, str]], List[str]]:
     errors: List[str] = []
     web_context: List[Dict[str, str]] = []
-    candidate_map: Dict[str, Dict[str, Any]] = {}
-    seed_ids = {paper.openalex_id for paper in seeds}
-    seed_dois = {paper.doi.lower() for paper in seeds if paper.doi}
-    disliked_ids = set()
-    disliked_dois = set()
+    entries: List[Tuple[Paper, Dict[str, Any]]] = []
+    excluded_aliases = {alias for paper in seeds for alias in _paper_aliases(paper)}
     for value in disliked:
         kind, parsed = parse_seed(value)
         if kind == "openalex":
-            disliked_ids.add(parsed)
+            excluded_aliases.add("id:" + parsed)
         elif kind == "doi":
-            disliked_dois.add(parsed.lower())
-
-    seed_pmids = {paper.pmid for paper in seeds if paper.pmid}
-    key_by_doi: Dict[str, str] = {}
-    key_by_pmid: Dict[str, str] = {}
+            excluded_aliases.add("doi:" + parsed.casefold())
+        elif kind == "pmid":
+            excluded_aliases.update(("pmid:" + parsed, "id:pmid:" + parsed))
 
     def add_paper(paper: Optional[Paper], signal: Dict[str, Any]) -> None:
-        if not paper or paper.openalex_id in seed_ids or paper.openalex_id in disliked_ids:
-            return
-        doi = (paper.doi or "").lower()
-        if doi and doi in (seed_dois | disliked_dois):
-            return
-        if paper.pmid and paper.pmid in seed_pmids:
-            return
-        key = paper.openalex_id
-        if key not in candidate_map:
-            key = key_by_doi.get(doi) or key_by_pmid.get(paper.pmid or "") or key
-        record = candidate_map.get(key)
-        if record is None:
-            if len(candidate_map) >= 200:
-                return
-            record = {"paper": paper, "signals": []}
-            candidate_map[key] = record
-            if doi:
-                key_by_doi[doi] = key
-            if paper.pmid:
-                key_by_pmid[paper.pmid] = key
-        if signal not in record["signals"]:
-            record["signals"].append(signal)
+        if paper:
+            entries.append((paper, signal))
 
     def add_work(work: Dict[str, Any], signal: Dict[str, Any]) -> None:
         add_paper(paper_from_work(work), signal)
@@ -119,8 +198,12 @@ async def gather_candidates(
     async def cites_seeds() -> None:
         if not _enabled(cfg, "cites_seeds"):
             return
-        batches = await asyncio.gather(*(client.citing(p.openalex_id) for p in seeds))
-        for index, works in enumerate(batches):
+        available = [(index, paper) for index, paper in enumerate(seeds)
+                     if re.fullmatch(r"W\d+", paper.openalex_id)]
+        if len(available) < len(seeds):
+            errors.append("Citation graph unavailable for PubMed-only seeds without an OpenAlex identity; other retrieval signals remain available.")
+        batches = await asyncio.gather(*(client.citing(p.openalex_id) for _, p in available))
+        for (index, _), works in zip(available, batches):
             for work in works:
                 add_work(work, {"type": "cites_seeds", "seeds": [index]})
 
@@ -189,6 +272,11 @@ async def gather_candidates(
                 reasoning_effort="low",
             )
             queries = _extract_json_list(generated.content)
+        except LLMError as exc:
+            if exc.systemic:
+                raise
+            errors.append(f"Discovery query generation: {exc}")
+            queries = []
         except Exception as exc:
             errors.append(f"Discovery query generation: {exc}")
             queries = []
@@ -226,8 +314,9 @@ async def gather_candidates(
         nonlocal web_context
         if not _enabled(cfg, "web"):
             return
-        key = os.getenv("TAVILY_API_KEY", "")
+        key = cfg.get("tavily_api_key") or os.getenv("TAVILY_API_KEY", "")
         if not key:
+            errors.append("Tavily: not configured; add TAVILY_API_KEY to enable web discovery")
             return
         topic = question.strip() or " ".join(paper.title for paper in seeds)
         try:
@@ -238,7 +327,8 @@ async def gather_candidates(
                     return_exceptions=True,
                 )
             if isinstance(general, Exception):
-                raise general
+                errors.append(f"Tavily general search: {general}")
+                general = []
             if isinstance(scholarly, Exception):
                 errors.append(f"Tavily scholarly search: {scholarly}")
                 scholarly = []
@@ -286,13 +376,17 @@ async def gather_candidates(
             log.warning("%s", message)
             errors.append(message)
 
-    await asyncio.gather(
-        cited_by_seeds(),
-        cites_seeds(),
-        related(),
-        semantic_scholar(),
-        search_candidates(),
-        web_search(),
-    )
+    tasks = [asyncio.create_task(route()) for route in (
+        cited_by_seeds, cites_seeds, related, semantic_scholar, search_candidates, web_search,
+    )]
+    try:
+        await asyncio.gather(*tasks)
+    except (Exception, asyncio.CancelledError):
+        # A provider-wide failure stops this run; do not leave unrelated API
+        # requests running after the caller has already received the error.
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     errors.extend(client.errors)
-    return list(candidate_map.values()), web_context, errors
+    return _fuse_candidates(entries, excluded_aliases), web_context, errors

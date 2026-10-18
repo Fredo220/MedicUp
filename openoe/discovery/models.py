@@ -19,8 +19,8 @@ class Paper(BaseModel):
     year: Optional[int] = None
     venue: Optional[str] = None
     authors: List[str] = Field(default_factory=list)
-    cited_by_count: int = 0
-    is_oa: bool = False
+    cited_by_count: Optional[int] = None
+    is_oa: Optional[bool] = None
     is_retracted: bool = False
     oa_url: Optional[str] = None
     topic: Optional[str] = None
@@ -35,10 +35,10 @@ class Paper(BaseModel):
 
 
 class DiscoverRequest(BaseModel):
-    question: str = ""
-    seeds: List[str] = Field(default_factory=list)
-    disliked: List[str] = Field(default_factory=list)
-    limit: int = 20
+    question: str = Field("", max_length=8000)
+    seeds: List[str] = Field(default_factory=list, max_length=50)
+    disliked: List[str] = Field(default_factory=list, max_length=500)
+    limit: int = Field(20, ge=1, le=100)
 
     @model_validator(mode="after")
     def _question_or_seeds(self) -> "DiscoverRequest":
@@ -60,9 +60,9 @@ class DiscoverResponse(BaseModel):
 
 
 class FollowupRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=8000)
     history: List[Dict[str, str]] = Field(default_factory=list)
-    papers: List[Dict[str, Any]]
+    papers: List[Dict[str, Any]] = Field(max_length=100)
 
 
 def short_openalex_id(value: Any) -> str:
@@ -123,8 +123,8 @@ def paper_from_work(work: Dict[str, Any]) -> Optional[Paper]:
         year=work.get("publication_year"),
         venue=source.get("display_name"),
         authors=authors,
-        cited_by_count=int(work.get("cited_by_count") or 0),
-        is_oa=bool(oa.get("is_oa")),
+        cited_by_count=int(work["cited_by_count"]) if work.get("cited_by_count") is not None else None,
+        is_oa=bool(oa["is_oa"]) if oa.get("is_oa") is not None else None,
         is_retracted=bool(work.get("is_retracted", False)),
         oa_url=oa.get("oa_url"),
         topic=primary_topic.get("display_name"),

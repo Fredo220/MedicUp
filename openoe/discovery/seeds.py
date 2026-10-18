@@ -4,10 +4,11 @@ from __future__ import annotations
 import logging
 
 import re
+import unicodedata
 from typing import List, Tuple
 from urllib.parse import unquote, urlparse
 
-from openoe.discovery.models import Paper, paper_from_work
+from openoe.discovery.models import Paper, normalize_doi, paper_from_work
 from openoe.discovery.openalex import OpenAlexClient
 from openoe.discovery.pubmed import lookup_pubmed
 
@@ -19,6 +20,11 @@ log = logging.getLogger(__name__)
 
 def _clean_doi(value: str) -> str:
     return value.rstrip(_TRAILING_PUNCTUATION)
+
+
+def _normalized_title(value: str) -> str:
+    """Allow typography/case differences without changing the publication identity."""
+    return " ".join(re.findall(r"\w+", unicodedata.normalize("NFKC", value).casefold()))
 
 
 def parse_seed(seed: str) -> Tuple[str, str]:
@@ -61,7 +67,8 @@ async def resolve_seeds(
     seen_keys: set[Tuple[str, str]] = set()
     seen_ids: set[str] = set()
     unique = []
-    for raw in strings[:10]:
+    # The API validates the collection limit; never silently drop feedback seeds.
+    for raw in strings:
         kind, value = parse_seed(raw)
         dedupe_key = (kind, value.casefold())
         if value and dedupe_key not in seen_keys:
@@ -69,21 +76,31 @@ async def resolve_seeds(
             unique.append((raw, kind, value))
 
     for raw, kind, value in unique:
+        paper = None
         if kind == "title":
-            matches = await client.search(value, 1)
-            work = matches[0] if matches else {}
-        elif kind == "doi":
-            work = await client.get_work(f"doi:{value}")
-        elif kind == "pmid":
-            work = await client.get_work(f"pmid:{value}")
+            matches = await client.search(value, 5)
+            exact = {}
+            for work in matches:
+                candidate = paper_from_work(work)
+                if candidate and _normalized_title(candidate.title) == _normalized_title(value):
+                    doi = normalize_doi(candidate.doi)
+                    identity = doi.casefold() if doi else candidate.pmid or candidate.openalex_id
+                    exact.setdefault(identity, candidate)
+            if len(exact) > 1:
+                # The same title can identify distinct publications (e.g. Editorial).
+                unresolved.append(raw)
+                continue
+            paper = next(iter(exact.values()), None)
         else:
-            work = await client.get_work(value)
-        paper = paper_from_work(work)
+            key = f"{kind}:{value}" if kind in ("doi", "pmid") else value
+            paper = paper_from_work(await client.get_work(key))
         if paper is None and kind in ("doi", "pmid", "title"):
             try:
                 paper = await lookup_pubmed(kind, value)
             except Exception as exc:
                 log.warning("PubMed seed lookup failed for %r: %s", raw, type(exc).__name__)
+            if paper and kind == "title" and _normalized_title(paper.title) != _normalized_title(value):
+                paper = None
         if paper is None or paper.openalex_id in seen_ids:
             unresolved.append(raw)
             continue

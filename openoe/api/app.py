@@ -13,12 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from openoe.core.config import load_config, validate_config, apply_overrides
+from openoe.core.config import load_config, validate_config
 from openoe.core.models import QueryRequest, QueryResponse
 from openoe.discovery.followup import answer_followup
 from openoe.discovery.models import DiscoverRequest, DiscoverResponse, FollowupRequest
 from openoe.discovery.service import discover
-from openoe.llm.client import LLMClient
+from openoe.llm.client import LLMClient, LLMError
 from openoe.llm.prompts import PromptManager
 from openoe.medicap import discover as medicap
 from openoe.medicap import figures as medicap_figures_mod
@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 
 
 class MedicapResolveRequest(BaseModel):
-    lines: List[str]
+    lines: List[str] = Field(max_length=50)
 
 
 class MedicapFiguresRequest(BaseModel):
@@ -39,7 +39,7 @@ class MedicapFiguresRequest(BaseModel):
 
 class MedicapDiscoverRequest(BaseModel):
     question: str = ""
-    seeds: List[str]
+    seeds: List[str] = Field(max_length=50)
     limit: int = Field(40, ge=5, le=100)
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -71,13 +71,23 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     app.state.llm = llm
     app.state.prompts = prompts
 
+    @app.exception_handler(LLMError)
+    async def provider_error(request: Request, error: LLMError):
+        return JSONResponse(status_code=503, content={"detail": error.to_dict()})
+
     # ── Routes ────────────────────────────────────────────────
 
     @app.get("/health", tags=["system"])
     async def health():
         routes = cfg.get("retrieval", {}).get("routes", {})
+        try:
+            llm.ensure_configured()
+            provider = {"configured": True, "connectivity_checked": False}
+        except LLMError as error:
+            provider = {"configured": False, "connectivity_checked": False, **error.to_dict()}
         return {
-            "status": "ok",
+            "status": "ok" if provider["configured"] else "degraded",
+            "llm": provider,
             "version": "0.2.0",
             "routes_enabled": [k for k, v in routes.items() if v.get("enabled")],
         }
@@ -125,16 +135,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def get_config():
         return _redact(cfg)
 
-    @app.patch("/api/config", tags=["admin"])
-    async def patch_config(request: Request):
-        body = await request.json()
-        overrides = body.get("overrides", {})
-        new_cfg = apply_overrides(cfg, overrides)
-        validate_config(new_cfg)
-        app.state.config = new_cfg
-        orch.update_config(new_cfg)
-        return {"status": "ok", "applied": list(overrides.keys())}
-
     @app.get("/api/traces/{trace_id}", tags=["admin"])
     async def get_trace(trace_id: str):
         t = orch.get_trace(trace_id)
@@ -145,12 +145,12 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     # ── Medicap: seed-based discovery ─────────────────────────
     @app.post("/api/medicap/resolve", tags=["medicap"])
     async def medicap_resolve(body: MedicapResolveRequest):
-        return {"results": await medicap.resolve(body.lines[:50], app.state.config)}
+        return {"results": await medicap.resolve(body.lines, app.state.config)}
 
     @app.post("/api/medicap/discover", tags=["medicap"])
     async def medicap_discover(body: MedicapDiscoverRequest):
         try:
-            return await medicap.discover(body.question, body.seeds[:30], app.state.config, llm=llm, limit=body.limit)
+            return await medicap.discover(body.question, body.seeds, app.state.config, llm=llm, limit=body.limit)
         except medicap.OpenAlexLimited as e:
             return JSONResponse(status_code=503, content={"detail": str(e)})
 
@@ -189,6 +189,8 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
             response = await orch.run(req, progress=send_progress)
             await ws.send_json({"type": "result", "data": response.model_dump()})
+        except LLMError as error:
+            await ws.send_json({"type": "error", **error.to_dict()})
         except WebSocketDisconnect:
             log.info("WebSocket client disconnected")
         except Exception as e:
@@ -224,6 +226,8 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
                 cfg=cfg.get("discovery", {}),
             )
             await ws.send_json({"type": "result", "data": response})
+        except LLMError as error:
+            await ws.send_json({"type": "error", **error.to_dict()})
         except WebSocketDisconnect:
             log.info("Discovery WebSocket client disconnected")
         except Exception as e:

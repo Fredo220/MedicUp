@@ -50,18 +50,15 @@ def test_resolve_line_kinds():
     assert amb["st"] in ("amb", "ok") and "W5" not in str(amb)
 
 
-def test_graph_and_loo_rank_hidden_seed():
-    # seeds S1=W1, S2=W2; W2 cites W1 and both cite W9, so hiding either still finds it via the graph.
+def test_graph_counts_only_selected_seed_citation_links():
     pool = {k: to_paper(w) for k, w in {
         "W1": _work("W1", "alpha beta", refs=["W9"]), "W2": _work("W2", "alpha gamma", refs=["W1", "W9"]),
         "W9": _work("W9", "alpha delta")}.items()}
     seeds = ["W1", "W2"]
     links = {"W1": {"cited_by": {1}}, "W9": {"cited_by": {0, 1}}}
-    vecs = M._tfidf({k: p["t"] for k, p in pool.items()})
-    sem = lambda use: {k: 1.0 for k in vecs}  # noqa: E731
-    rows = M._loo(pool, seeds, links, ["W9"], [], sem, {})
-    assert rows[0]["seed"] == 1 and rows[0]["graph"] is not None
-    assert rows[0]["keyword"] is None and rows[0]["web"] is None
+    graph = M._graph(pool, seeds, links, {0})
+    assert graph["W9"]["direct"] == {0}
+    assert graph["W1"]["direct"] == set()
 
 
 def test_figure_matching_only_accepts_the_papers_own_images():
