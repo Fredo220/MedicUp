@@ -180,35 +180,42 @@ class LLMClient:
         key = prov_cfg.get("api_key", "")
         if not base or not key:
             raise RuntimeError(f"LLM provider '{default_prov}' missing base_url or api_key")
-        vectors: List[List[float]] = []
-        for start in range(0, len(texts), 32):
-            batch = texts[start:start + 32]
-            body = {"model": model, "input": batch}
+        semaphore = asyncio.Semaphore(4)
+
+        async def embed_batch(start: int, batch: List[str]) -> List[List[float]]:
             last_err = ""
             for attempt in range(self._retries):
                 try:
-                    async with httpx.AsyncClient(timeout=120.0) as client:
-                        response = await client.post(
-                            f"{base}/embeddings",
-                            headers={"Authorization": f"Bearer {key}"},
-                            json=body,
-                        )
-                        response.raise_for_status()
-                        data = response.json()
+                    async with semaphore:
+                        async with httpx.AsyncClient(timeout=120.0) as client:
+                            response = await client.post(
+                                f"{base}/embeddings",
+                                headers={"Authorization": f"Bearer {key}"},
+                                json={"model": model, "input": batch},
+                            )
+                            response.raise_for_status()
+                            data = response.json()
                     indexed = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
                     batch_vectors = [item.get("embedding", []) for item in indexed]
                     if len(batch_vectors) != len(batch) or any(not vector for vector in batch_vectors):
                         raise RuntimeError("embedding response did not match input batch")
-                    vectors.extend(batch_vectors)
-                    break
+                    return batch_vectors
                 except Exception as exc:
                     last_err = str(exc)
                     log.warning("[LLM embeddings] batch %d attempt %d: %s", start // 32 + 1, attempt + 1, last_err)
                     if attempt < self._retries - 1:
                         await asyncio.sleep(self._delay(attempt))
-            else:
-                raise RuntimeError(f"LLM embeddings failed after {self._retries} retries: {last_err}")
-        return vectors
+            raise RuntimeError(f"LLM embeddings failed after {self._retries} retries: {last_err}")
+
+        batches = [
+            texts[start:start + 32]
+            for start in range(0, len(texts), 32)
+        ]
+        results = await asyncio.gather(*(
+            embed_batch(start, batch)
+            for start, batch in zip(range(0, len(texts), 32), batches)
+        ))
+        return [vector for batch_vectors in results for vector in batch_vectors]
 
     def _delay(self, attempt: int) -> float:
         return float(self._backoff[min(attempt, len(self._backoff) - 1)]) if self._backoff else 2.0

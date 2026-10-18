@@ -1,5 +1,9 @@
+import asyncio
+
 import httpx
 
+import openoe.llm.client as llm_client_module
+from openoe.llm.client import LLMClient
 from openoe.discovery.rank import (
     _BARE_CITATION_RE,
     calculate_final_score,
@@ -88,3 +92,57 @@ def test_openalex_error_description_does_not_expose_request_query():
     error = httpx.HTTPStatusError("rate limited", request=response.request, response=response)
     assert _describe_error(error) == "HTTP 429"
     assert "private" not in _describe_error(error)
+
+
+def test_embedding_batches_preserve_order_with_concurrent_http_posts(monkeypatch):
+    active_posts = 0
+    max_active_posts = 0
+
+    class StubResponse:
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": self.data}
+
+    class StubAsyncClient:
+        def __init__(self, timeout):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, *, headers, json):
+            nonlocal active_posts, max_active_posts
+            active_posts += 1
+            max_active_posts = max(max_active_posts, active_posts)
+            if json["input"][0] == "text-0":
+                await asyncio.sleep(0.04)
+            else:
+                await asyncio.sleep(0.005)
+            data = [
+                {
+                    "index": index,
+                    "embedding": [float(text.split("-")[1])],
+                }
+                for index, text in reversed(list(enumerate(json["input"])))
+            ]
+            active_posts -= 1
+            return StubResponse(data)
+
+    monkeypatch.setattr(llm_client_module.httpx, "AsyncClient", StubAsyncClient)
+    llm = LLMClient({
+        "default_provider": "test",
+        "providers": {"test": {"base_url": "http://stub/v1", "api_key": "test-key"}},
+        "retry": {"max_retries": 1, "backoff": []},
+    })
+    embeddings = asyncio.run(llm.embed([f"text-{index}" for index in range(129)], "stub-model"))
+
+    assert embeddings == [[float(index)] for index in range(129)]
+    assert 2 <= max_active_posts <= 4
