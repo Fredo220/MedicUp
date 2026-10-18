@@ -78,8 +78,8 @@ async def enhance_query(
                 "keyword_extraction",
                 question=question,
                 max_keywords=max_kw,
-                hyde_text=hyde or "(无)",
-                translated=translated or "(无)",
+                hyde_text=hyde or "(none)",
+                translated=translated or "(none)",
             )
             r = await llm.chat(
                 step="keywords",

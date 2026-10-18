@@ -34,7 +34,7 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     cfg = load_config(config_path)
     validate_config(cfg)
 
-    app = FastAPI(title="Open OE", version="0.2.0", description="开源医学 RAG 问答系统")
+    app = FastAPI(title="MedicUp", version="0.2.0", description="Evidence-based medical literature search engine")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     prompts = PromptManager()
@@ -133,7 +133,7 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
         html = _STATIC_DIR / "index.html"
         if html.exists():
             return FileResponse(html, media_type="text/html")
-        return {"message": "Open OE API — visit /docs for API documentation"}
+        return {"message": "MedicUp API — visit /docs for API documentation"}
 
     if _STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

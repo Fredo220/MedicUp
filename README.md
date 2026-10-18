@@ -1,3 +1,18 @@
+# MedicUp
+
+Evidence-based medical literature search engine with cited answers and follow-up questions.
+Built on [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) (MIT) and powered by [Nebius Token Factory](https://tokenfactory.nebius.com).
+
+Quick start:
+
+```bash
+cp .env_template .env   # add NEBIUS_API_KEY
+pip install -e .
+openoe --port 8000      # open http://localhost:8000
+```
+
+---
+
 <div align="center">
 
 # 🏥 OpenOE-Lite

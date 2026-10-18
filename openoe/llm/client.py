@@ -77,15 +77,15 @@ class LLMClient:
         reasoning_effort: Optional[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
     ) -> LLMResult:
-        """Call LLM via OpenRouter.
+        """Call an OpenAI-compatible chat endpoint (Nebius Token Factory by default).
 
         Args:
             max_tokens: max_completion_tokens (includes reasoning tokens for reasoning models).
             reasoning_effort: "low" | "medium" | "high" | None.
                 For lightweight tasks (Y/N, keywords), use "low" to minimize reasoning overhead.
-            provider: OpenRouter provider routing (e.g. "google-vertex").
+            provider: OpenRouter-only provider routing (e.g. "google-vertex").
         """
-        default_prov = self.cfg.get("default_provider", "openrouter")
+        default_prov = self.cfg.get("default_provider", "nebius")
         prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
         base = str(prov_cfg.get("base_url", "")).rstrip("/")
         key = prov_cfg.get("api_key", "")
@@ -102,10 +102,11 @@ class LLMClient:
             "messages": messages,
             "max_completion_tokens": max_tokens,
         }
-        if provider:
-            body["provider"] = {"order": [provider], "allow_fallbacks": False}
-        if reasoning_effort:
-            body["reasoning"] = {"effort": reasoning_effort}
+        if default_prov == "openrouter":
+            if provider:
+                body["provider"] = {"order": [provider], "allow_fallbacks": False}
+            if reasoning_effort:
+                body["reasoning"] = {"effort": reasoning_effort}
 
         t0 = time.perf_counter()
         last_err = ""

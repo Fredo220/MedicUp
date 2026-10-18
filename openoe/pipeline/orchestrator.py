@@ -56,21 +56,21 @@ class Orchestrator:
         log.info("┌─ Query [%s]: %s", ctx.trace.request_id[:8], ctx.question[:80])
 
         # ── Stage 0: Safety ──────────────────────────────────
-        await emit("safety", "正在进行安全检查…", {})
+        await emit("safety", "Running safety check…", {})
         t0 = time.perf_counter()
         ctx.safety = await safety.check_safety(ctx.question, stages.get("safety", {}), self.llm, self.prompts)
         ctx.trace.time("stage0_safety_ms", (time.perf_counter() - t0) * 1000)
         flag = ctx.safety.get("flag", "medical_related") if ctx.safety else "skipped"
         log.info("├─ Stage 0 Safety: %s (%.0fms)", flag, ctx.trace.timings.get("stage0_safety_ms", 0))
-        await emit("safety", f"安全检查完成: {flag}", {"flag": flag})
+        await emit("safety", f"Safety check: {flag}", {"flag": flag})
 
         if ctx.safety and flag in ("unsafe", "non_medical"):
             log.warning("└─ Pipeline stopped at safety: %s — %s", flag, ctx.safety.get("reason", ""))
-            await emit("done", "安全检查未通过", {"flag": flag})
+            await emit("done", "Safety check failed", {"flag": flag})
             return self._safety_response(ctx, flag, ctx.safety.get("reason", ""))
 
         # ── Stage 1: Enhance ─────────────────────────────────
-        await emit("enhance", "正在增强查询 (HyDE + 翻译 + 关键词)…", {})
+        await emit("enhance", "Expanding query (HyDE + rewrite + keywords)…", {})
         t1 = time.perf_counter()
         enhanced = await enhance.enhance_query(
             ctx.question, stages.get("enhance", {}), self.llm, self.prompts,
@@ -87,13 +87,13 @@ class Orchestrator:
                  ctx.search_query[:60] if ctx.search_query else "none",
                  "yes" if ctx.hyde_text else "no",
                  "yes" if ctx.translated else "no")
-        await emit("enhance", "查询增强完成", {
+        await emit("enhance", "Query expanded", {
             "search_query": ctx.search_query[:80] if ctx.search_query else None,
             "translated": ctx.translated[:80] if ctx.translated else None,
         })
 
         # ── Stage 2: Retrieval ───────────────────────────────
-        await emit("retrieval", "正在检索文献…", {})
+        await emit("retrieval", "Searching literature…", {})
         t2 = time.perf_counter()
         effective_query = ctx.search_query or ctx.translated or ctx.hyde_text or ctx.question
         retrieval_keywords = list(ctx.keywords)
@@ -119,7 +119,7 @@ class Orchestrator:
             log.info("│  └─ route %-20s %s (%.0fms)", t.route, status, t.latency_ms)
         log.info("├─ Stage 2 total: %d papers, %d guidelines (%.0fms)",
                  len(ctx.raw_papers), len(ctx.raw_guidelines), ctx.trace.timings["stage2_retrieval_ms"])
-        await emit("retrieval", f"检索到 {len(ctx.raw_papers)} 篇论文, {len(ctx.raw_guidelines)} 条指南", {
+        await emit("retrieval", f"Found {len(ctx.raw_papers)} papers, {len(ctx.raw_guidelines)} guidelines", {
             "papers": len(ctx.raw_papers), "guidelines": len(ctx.raw_guidelines),
         })
 
@@ -128,7 +128,7 @@ class Orchestrator:
             raise RuntimeError("All retrieval routes failed: " + "; ".join(f"{t.route}: {t.error}" for t in ctx.trace.retrieval))
 
         # ── Stage 3: Merge ───────────────────────────────────
-        await emit("merge", "正在合并去重…", {})
+        await emit("merge", "Merging and de-duplicating…", {})
         t3 = time.perf_counter()
         merge_cfg = cfg.get("merge", {})
         ctx.merged_papers = merge.merge_documents(ctx.raw_papers, cfg=merge_cfg.get("papers", {}))
@@ -138,12 +138,12 @@ class Orchestrator:
                  ctx.trace.timings["stage3_merge_ms"],
                  len(ctx.raw_papers), len(ctx.merged_papers),
                  len(ctx.raw_guidelines), len(ctx.merged_guidelines))
-        await emit("merge", f"去重后 {len(ctx.merged_papers)} 篇论文, {len(ctx.merged_guidelines)} 条指南", {
+        await emit("merge", f"{len(ctx.merged_papers)} papers, {len(ctx.merged_guidelines)} guidelines after de-duplication", {
             "papers": len(ctx.merged_papers), "guidelines": len(ctx.merged_guidelines),
         })
 
         # ── Stage 4: Filter & Extract ────────────────────────
-        await emit("filter", f"正在过滤 {len(ctx.merged_papers)} 篇论文…", {"total": len(ctx.merged_papers)})
+        await emit("filter", f"Checking relevance of {len(ctx.merged_papers)} papers…", {"total": len(ctx.merged_papers)})
         t4 = time.perf_counter()
         filter_cfg = stages.get("filter", {})
         ctx.filtered_papers = await filter.filter_papers(
@@ -156,12 +156,12 @@ class Orchestrator:
         log.info("├─ Stage 4 Filter (%.0fms): %d→%d papers, %d guidelines with chunks",
                  ctx.trace.timings["stage4_filter_ms"],
                  len(ctx.merged_papers), len(ctx.filtered_papers), len(ctx.filtered_guidelines))
-        await emit("filter", f"保留 {len(ctx.filtered_papers)} 篇相关论文, {len(ctx.filtered_guidelines)} 条指南", {
+        await emit("filter", f"Kept {len(ctx.filtered_papers)} relevant papers, {len(ctx.filtered_guidelines)} guidelines", {
             "papers_kept": len(ctx.filtered_papers), "guidelines_kept": len(ctx.filtered_guidelines),
         })
 
         # ── Stage 5: Answer ──────────────────────────────────
-        await emit("answer", "正在生成循证回答…", {})
+        await emit("answer", "Writing evidence-based answer…", {})
         t5 = time.perf_counter()
         log.info("├─ Stage 5 Answer: generating with model=%s ...", stages.get("answer", {}).get("model", "?"))
         ans = await answer.generate_answer(
@@ -183,7 +183,7 @@ class Orchestrator:
         log.info("└─ Done [%s] total=%.0fms | papers=%d guidelines=%d citations=%d",
                  ctx.trace.request_id[:8], ctx.trace.timings["total_ms"],
                  len(ctx.filtered_papers), len(ctx.filtered_guidelines), len(ctx.cited_sources))
-        await emit("done", "回答生成完成", {"citations": len(ctx.cited_sources)})
+        await emit("done", "Answer ready", {"citations": len(ctx.cited_sources)})
 
         return QueryResponse(
             answer=ctx.answer or "",
@@ -198,9 +198,9 @@ class Orchestrator:
 
     def _safety_response(self, ctx: QueryContext, flag: str, reason: str) -> QueryResponse:
         if flag == "unsafe":
-            md = f"## ⚠️ 安全警告\n\n您的问题未通过安全检查。\n\n**原因：** {reason}"
+            md = f"## ⚠️ Safety warning\n\nYour question did not pass the safety check.\n\n**Reason:** {reason}"
         else:
-            md = f"## ℹ️ 温馨提示\n\n您的问题似乎不属于医疗健康领域。\n\n**系统判断：** {reason}"
+            md = f"## ℹ️ Note\n\nYour question does not seem to be about medicine or life sciences.\n\n**Reason:** {reason}"
         ctx.trace.finish()
         return QueryResponse(
             answer=md, markdown=md, citations=[],

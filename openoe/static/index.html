@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Open OE — Evidence-Based Medical AI</title>
+<title>MedicUp — Evidence-Based Medical Search</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -169,24 +169,24 @@ sup.cite:hover .cite-tooltip{opacity:1}
 
 <!-- Header -->
 <header class="header">
-  <h1><span>Open</span> OE Lite</h1>
+  <h1><span>Medic</span>Up</h1>
   <p>Evidence-Based Medical AI</p>
 </header>
 
 <!-- Search -->
 <div class="search-wrap">
   <form class="search-box" id="searchForm" autocomplete="off">
-    <input type="text" id="queryInput" placeholder="输入医学问题…" autofocus>
-    <button type="submit" id="submitBtn">搜索</button>
+    <input type="text" id="queryInput" placeholder="Ask a medical research question…" autofocus>
+    <button type="submit" id="submitBtn">Search</button>
   </form>
 </div>
 
 <!-- Example chips -->
 <div class="examples" id="examples">
-  <span class="chip" data-q="JAK抑制剂使用有哪些注意事项？">JAK抑制剂注意事项</span>
-  <span class="chip" data-q="GLP-1药物有哪些安全风险？">GLP-1药物有哪些安全风险</span>
-  <span class="chip" data-q="糖尿病患者的血糖控制目标应该如何设定？">血糖控制目标</span>
-  <span class="chip" data-q="已经使用过抗血管生成药物的卵巢肿瘤患者复发之后能否再次使用抗血管生成药物？">卵巢癌治疗</span>
+  <span class="chip" data-q="What are the safety considerations when using JAK inhibitors?">JAK inhibitor safety</span>
+  <span class="chip" data-q="What are the main safety risks of GLP-1 receptor agonists?">GLP-1 agonist risks</span>
+  <span class="chip" data-q="How should HbA1c targets be set for patients with type 2 diabetes?">HbA1c targets</span>
+  <span class="chip" data-q="Can patients with recurrent ovarian cancer who already received bevacizumab benefit from anti-angiogenic re-treatment?">Ovarian cancer re-treatment</span>
 </div>
 
 <!-- Main container -->
@@ -194,7 +194,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
   <!-- Progress -->
   <div class="progress-section" id="progressSection">
     <div class="progress-card">
-      <div class="progress-title">处理中…</div>
+      <div class="progress-title">Working…</div>
       <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar"></div></div>
       <div class="stage-list" id="stageList"></div>
     </div>
@@ -207,26 +207,26 @@ sup.cite:hover .cite-tooltip{opacity:1}
 <!-- Mobile reference modal -->
 <div class="ref-modal-overlay" id="refModalOverlay">
   <div class="ref-modal" id="refModal">
-    <button class="ref-modal-close" id="refModalClose" aria-label="关闭">&times;</button>
+    <button class="ref-modal-close" id="refModalClose" aria-label="Close">&times;</button>
     <div id="refModalBody"></div>
   </div>
 </div>
 
 <!-- Footer -->
-<footer class="footer">Open OE · 仅供研究参考 · 不构成医疗建议</footer>
+<footer class="footer">MedicUp · for research only · not medical advice</footer>
 
 <script>
 (function(){
   "use strict";
 
   const STAGES = [
-    {key:"safety",   label:"安全检查"},
-    {key:"enhance",  label:"问题增强"},
-    {key:"retrieval",label:"文献检索"},
-    {key:"merge",    label:"去重合并"},
-    {key:"filter",   label:"相关性过滤"},
-    {key:"answer",   label:"生成回答"},
-    {key:"done",     label:"完成"}
+    {key:"safety",   label:"Safety check"},
+    {key:"enhance",  label:"Query expansion"},
+    {key:"retrieval",label:"Literature search"},
+    {key:"merge",    label:"De-duplicate"},
+    {key:"filter",   label:"Relevance filter"},
+    {key:"answer",   label:"Write answer"},
+    {key:"done",     label:"Done"}
   ];
 
   const stageIndex = Object.fromEntries(STAGES.map((s,i)=>[s.key,i]));
@@ -315,10 +315,10 @@ sup.cite:hover .cite-tooltip{opacity:1}
     switch(stage) {
       case "safety":    return data.flag ? data.flag : "";
       case "enhance":   return data.search_query ? `"${data.search_query}"` : "";
-      case "retrieval": return (data.papers != null) ? `论文 ${data.papers}，指南 ${data.guidelines||0}` : "";
-      case "merge":     return (data.papers != null) ? `论文 ${data.papers}，指南 ${data.guidelines||0}` : "";
-      case "filter":    return (data.papers_kept != null) ? `保留 ${data.papers_kept} / ${data.total||"?"}` : "";
-      case "done":      return (data.citations != null) ? `引用 ${data.citations}` : "";
+      case "retrieval": return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";
+      case "merge":     return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";
+      case "filter":    return (data.papers_kept != null) ? `kept ${data.papers_kept} / ${data.total||"?"}` : "";
+      case "done":      return (data.citations != null) ? `citations ${data.citations}` : "";
       default: return "";
     }
   }
@@ -418,7 +418,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
     let html = marked.parse(rawAnswer);
     html = html.replace(/\[\^(\d+)\]/g, (_, n) => {
       const ci = parseInt(n, 10) - 1;
-      const title = (citations[ci] && citations[ci].title) ? citations[ci].title.replace(/"/g, '&quot;') : `参考 ${n}`;
+      const title = (citations[ci] && citations[ci].title) ? citations[ci].title.replace(/"/g, '&quot;') : `Ref ${n}`;
       return `<sup class="cite" data-ref="${n}" onclick="window.__handleCite(${eid},${n})">` +
              `${n}<span class="cite-tooltip">${title}</span></sup>`;
     });
@@ -429,7 +429,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
     if (citations.length > 0) {
       const refsPanel = document.createElement("div");
       refsPanel.className = "refs-panel";
-      refsPanel.innerHTML = `<div class="refs-title">参考文献</div>`;
+      refsPanel.innerHTML = `<div class="refs-title">References</div>`;
       citations.forEach((c, i) => {
         const num = i + 1;
         const refId = `ref-${eid}-${num}`;
@@ -467,15 +467,15 @@ sup.cite:hover .cite-tooltip{opacity:1}
     const statsDiv = document.createElement("div");
     statsDiv.className = "stats-bar";
     statsDiv.innerHTML =
-      `<span>检索 <span class="accent">${stats.papers_retrieved ?? "?"}</span></span>` +
+      `<span>Retrieved <span class="accent">${stats.papers_retrieved ?? "?"}</span></span>` +
       `<span class="sep">→</span>` +
-      `<span>去重 <span class="accent">${stats.papers_after_merge ?? "?"}</span></span>` +
+      `<span>Merged <span class="accent">${stats.papers_after_merge ?? "?"}</span></span>` +
       `<span class="sep">→</span>` +
-      `<span>过滤 <span class="accent">${stats.papers_after_filter ?? "?"}</span></span>` +
+      `<span>Relevant <span class="accent">${stats.papers_after_filter ?? "?"}</span></span>` +
       `<span class="sep">→</span>` +
-      `<span>引用 <span class="accent">${citations.length}</span></span>` +
+      `<span>Cited <span class="accent">${citations.length}</span></span>` +
       `<span class="sep">|</span>` +
-      `<span>耗时 <span class="accent">${totalSec}s</span></span>`;
+      `<span>Time <span class="accent">${totalSec}s</span></span>`;
     statsWrap.appendChild(statsDiv);
     entry.appendChild(statsWrap);
 
@@ -567,7 +567,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
       submitBtn.disabled = false;
       const errDiv = document.createElement("div");
       errDiv.className = "error-msg";
-      errDiv.textContent = "查询失败: " + err.message;
+      errDiv.textContent = "Query failed: " + err.message;
       history.insertBefore(errDiv, history.firstChild);
     });
   }
