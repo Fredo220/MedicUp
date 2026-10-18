@@ -16,6 +16,7 @@ from openoe.llm.prompts import PromptManager
 from openoe.utils.text import truncate
 
 log = logging.getLogger(__name__)
+_BARE_NUMERIC_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +58,7 @@ async def generate_answer(
 
     answer = _fix_chinese_citations(result.content.strip())
     answer = _remove_trailing_references(answer)
+    answer = _BARE_NUMERIC_CITATION_RE.sub("", answer)
     cited_ids = _extract_cited_ids(answer)
     log.info("Stage 5 cited_ids=%s from %d sources", cited_ids, len(sources))
     answer, cited = _reindex(answer, sources, cited_ids)

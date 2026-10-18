@@ -172,5 +172,43 @@ class LLMClient:
 
         raise RuntimeError(f"LLM '{step}' failed after {self._retries} retries: {last_err}")
 
+    async def embed(self, texts: List[str], model: str) -> List[List[float]]:
+        """Create OpenAI-compatible embeddings in bounded batches."""
+        default_prov = self.cfg.get("default_provider", "nebius")
+        prov_cfg = self.cfg.get("providers", {}).get(default_prov, {})
+        base = str(prov_cfg.get("base_url", "")).rstrip("/")
+        key = prov_cfg.get("api_key", "")
+        if not base or not key:
+            raise RuntimeError(f"LLM provider '{default_prov}' missing base_url or api_key")
+        vectors: List[List[float]] = []
+        for start in range(0, len(texts), 32):
+            batch = texts[start:start + 32]
+            body = {"model": model, "input": batch}
+            last_err = ""
+            for attempt in range(self._retries):
+                try:
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        response = await client.post(
+                            f"{base}/embeddings",
+                            headers={"Authorization": f"Bearer {key}"},
+                            json=body,
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                    indexed = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
+                    batch_vectors = [item.get("embedding", []) for item in indexed]
+                    if len(batch_vectors) != len(batch) or any(not vector for vector in batch_vectors):
+                        raise RuntimeError("embedding response did not match input batch")
+                    vectors.extend(batch_vectors)
+                    break
+                except Exception as exc:
+                    last_err = str(exc)
+                    log.warning("[LLM embeddings] batch %d attempt %d: %s", start // 32 + 1, attempt + 1, last_err)
+                    if attempt < self._retries - 1:
+                        await asyncio.sleep(self._delay(attempt))
+            else:
+                raise RuntimeError(f"LLM embeddings failed after {self._retries} retries: {last_err}")
+        return vectors
+
     def _delay(self, attempt: int) -> float:
         return float(self._backoff[min(attempt, len(self._backoff) - 1)]) if self._backoff else 2.0

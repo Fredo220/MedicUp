@@ -49,6 +49,30 @@ stages:
     prompt_template: generate_answer_v4
     system_prompt: medical_expert
 
+discovery:
+  small_model: "${MEDICUP_SMALL_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}"
+  strong_model: "${MEDICUP_STRONG_MODEL:Qwen/Qwen3-235B-A22B-Instruct-2507}"
+  embedding_model: "${MEDICUP_EMBED_MODEL:Qwen/Qwen3-Embedding-8B}"
+  judge_k: 25
+  limit: 20
+  openalex:
+    base_url: "https://api.openalex.org"
+    email: "${OPENALEX_EMAIL:}"
+    api_key: "${OPENALEX_API_KEY:}"
+  signals:
+    cited_by_seeds:
+      enabled: true
+    cites_seeds:
+      enabled: true
+    related:
+      enabled: true
+    s2_recommendation:
+      enabled: true
+    search:
+      enabled: true
+    web:
+      enabled: true
+
 llm:
   default_provider: nebius
   providers:

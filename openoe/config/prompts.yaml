@@ -158,3 +158,43 @@ generate_answer_v4: |
 
   ### Question:
   {question}
+
+discovery_queries: |
+  You are a medical literature search expert.
+  Given the research question and seed-paper titles, produce up to two short English queries for OpenAlex article search.
+  Focus on concepts that can find new, directly relevant studies. If the question is empty, derive queries from the seed titles.
+  Output a JSON list of strings only, with no surrounding prose.
+
+  Research question:
+  {question}
+
+  Seed paper titles:
+  {seed_titles}
+
+discovery_judge: |
+  Judge how relevant this new paper is to the research question and seed papers.
+  Return JSON only with this exact shape:
+  {{"relevance": 0, "why": "1-2 sentences tied to the question/seeds", "quote": "one verbatim sentence from the abstract that supports it, or empty", "related_seeds": ["S1"]}}
+  Relevance must be an integer from 0 to 10. The quote must be copied verbatim from the abstract. Use only seed labels shown below.
+
+  Research question:
+  {question}
+
+  Seed papers:
+  {seed_titles}
+
+  Candidate paper:
+  Title: {title}
+  Year: {year}
+  Abstract: {abstract}
+
+discovery_followup: |
+  Answer the research question using only the numbered papers below. Write in English and under 250 words.
+  Cite supported statements with the original paper numbers in footnote form, such as [^1].
+  If these papers do not answer the question, say so clearly. Do not add uncited medical claims or a reference list.
+
+  Research question:
+  {question}
+
+  Numbered papers:
+  {papers}
