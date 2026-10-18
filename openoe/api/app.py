@@ -177,6 +177,10 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     # ── Frontend ──────────────────────────────────────────────
     @app.get("/", include_in_schema=False)
+    async def landing():
+        return FileResponse(_STATIC_DIR / "landing.html", media_type="text/html")
+
+    @app.get("/app", include_in_schema=False)
     @app.get("/medicap", include_in_schema=False)
     async def medicap_ui():
         return FileResponse(_STATIC_DIR / "medicap.html", media_type="text/html")

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medicap: literature discovery that explains itself</title>
+<meta name="description" content="Start from the papers you trust. Medicap follows citations, searches the literature and the web, and ranks what you missed with transparent 1–100% scores.">
+<style>
+:root{--bg:#fbfaf7;--fg:#141414;--muted:#5f5d58;--faint:#97948d;--line:#e7e3da;--card:#ffffff;--accent:#2563eb;--radius:22px;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0d0d0c;--fg:#f3f1ec;--muted:#b3afa6;--faint:#7c786f;--line:#26241f;--card:#151513}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+nav{position:sticky;top:0;z-index:10;backdrop-filter:saturate(1.4) blur(14px);background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid transparent;transition:border-color .2s}
+nav.scrolled{border-color:var(--line)}
+nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.01em}
+.logo svg{width:26px;height:26px}
+.links{display:flex;gap:22px;color:var(--muted);font-size:14.5px}
+.links a:hover{color:var(--fg)}
+.sp{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font-weight:550;font-size:15px;transition:transform .15s,opacity .15s,background .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:var(--fg);color:var(--bg)}
+.btn.ghost{border:1px solid var(--line);color:var(--fg)}
+.btn.ghost:hover{background:var(--card)}
+.btn.sm{height:36px;padding:0 16px;font-size:14px}
+header.hero{padding:88px 0 40px;text-align:center}
+.eyebrow{display:inline-flex;gap:8px;align-items:center;font:500 12.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px color-mix(in srgb,#22c55e 20%,transparent)}
+h1{font:400 clamp(44px,7.4vw,92px)/1.02 var(--serif);letter-spacing:-.025em;margin:22px auto 18px;max-width:14ch}
+h1 em{font-style:italic;color:var(--muted)}
+.lede{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:640px;margin:0 auto 32px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.note{margin-top:18px;font-size:13.5px;color:var(--faint)}
+.paint{position:relative;border-radius:var(--radius);overflow:hidden;background:#222;box-shadow:0 30px 80px -30px rgba(0,0,0,.45)}
+.paint img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.06);transition:transform 1.6s cubic-bezier(.2,.7,.2,1)}
+.paint.in img{transform:scale(1)}
+.paint figcaption{position:absolute;left:16px;bottom:14px;font:500 11.5px var(--mono);color:rgba(255,255,255,.82);text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.hero-img{margin:56px auto 0;aspect-ratio:16/9;max-height:640px}
+.hero-img img{object-position:50% 40%}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:72px 0 24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stats div{padding:30px 10px;text-align:center}
+.stats div+div{border-left:1px solid var(--line)}
+.stats b{display:block;font:400 clamp(30px,4vw,46px)/1.1 var(--serif);letter-spacing:-.02em}
+.stats span{color:var(--muted);font-size:14px}
+section{padding:96px 0}
+.split{display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center}
+.split.rev{grid-template-columns:1fr 1.05fr}
+.split.rev .paint{order:2}
+.kicker{font:500 12.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h2{font:400 clamp(34px,4.6vw,56px)/1.06 var(--serif);letter-spacing:-.02em;margin:12px 0 18px}
+p.big{font-size:18px;color:var(--muted);margin:0 0 26px;max-width:52ch}
+.tall{aspect-ratio:4/5}
+.wide{aspect-ratio:21/9}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
+.step .n{font:500 12px var(--mono);color:var(--faint)}
+.step h3{font:600 17px/1.3 var(--sans);margin:10px 0 6px;letter-spacing:-.01em}
+.step p{margin:0;color:var(--muted);font-size:14.5px}
+.feat{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:36px}
+.feat div{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--card)}
+.feat b{display:block;font-size:15px;margin-bottom:4px}
+.feat span{font-size:13.5px;color:var(--muted)}
+.quote{text-align:center;max-width:900px;margin:0 auto}
+.quote blockquote{font:400 clamp(28px,3.8vw,46px)/1.2 var(--serif);letter-spacing:-.015em;margin:28px 0 22px}
+.quote cite{font-style:normal;color:var(--muted);font-size:15px}
+.band{position:relative;margin-top:56px}
+.band .over{position:absolute;inset:auto 0 0 0;padding:32px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.65));font:400 clamp(18px,2.2vw,24px)/1.35 var(--serif)}
+.final{text-align:center;padding:120px 0}
+.final h2{max-width:16ch;margin:12px auto 18px}
+.term{display:inline-flex;align-items:center;gap:12px;margin:8px auto 30px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);font:14px var(--mono);color:var(--muted)}
+.term b{color:var(--fg);font-weight:500}
+footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--faint);font-size:13px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px 40px;justify-content:space-between}
+footer a{text-decoration:underline;text-underline-offset:3px}
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.paint img{transform:none;transition:none}}
+@media (max-width:900px){.links{display:none}.split,.split.rev{grid-template-columns:1fr;gap:32px}.split.rev .paint{order:0}.steps{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr 1fr}header.hero{padding-top:56px}section{padding:64px 0}}
+@media (max-width:520px){.steps,.feat{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stats div+div{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<nav id="nav"><div class="wrap">
+  <a class="logo" href="/"><svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="4.5" fill="currentColor"/><circle cx="6" cy="8" r="2.6" fill="#2563eb"/><circle cx="26" cy="7" r="2.6" fill="#2563eb"/><circle cx="7" cy="25" r="2.6" fill="#2563eb"/><circle cx="25" cy="25" r="2.6" fill="#2563eb"/><path d="M16 16C12 13 9 10 6 8M16 16c4-3 7-6 10-9M16 16c-4 3-7 6-9 9M16 16c4 3 6 6 9 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Medicap</a>
+  <div class="links"><a href="#how">How it works</a><a href="#explain">Transparency</a><a href="#evaluate">Evaluation</a><a href="/docs">API</a></div>
+  <div class="sp"></div>
+  <a class="btn primary sm" href="/app">Open dashboard</a>
+</div></nav>
+
+<header class="hero wrap">
+  <span class="eyebrow reveal"><i></i>Live on OpenAlex &amp; Tavily</span>
+  <h1 class="reveal">The literature, <em>followed</em> for you.</h1>
+  <p class="lede reveal">Start from the papers you already trust. Medicap follows their citations, searches the literature and the scholarly web, and ranks what you missed. Every score comes with its reasons.</p>
+  <div class="cta reveal"><a class="btn primary" href="/app">Open the dashboard →</a><a class="btn ghost" href="#how">See how it works</a></div>
+  <div class="note reveal">No account needed. Paste DOIs, PMIDs or titles.</div>
+  <figure class="paint hero-img reveal"><img src="/static/landing/anatomy.jpg" alt="Rembrandt, The Anatomy Lesson of Dr Nicolaes Tulp (1632)" fetchpriority="high"><figcaption>Rembrandt · The Anatomy Lesson of Dr Nicolaes Tulp · 1632</figcaption></figure>
+  <div class="stats reveal">
+    <div><b>3</b><span>discovery channels: citation graph, literature search, scholarly web</span></div>
+    <div><b>1–100%</b><span>scores you can read, re-weight and audit</span></div>
+    <div><b>Leave-one-out</b><span>evaluation on your own seed papers</span></div>
+  </div>
+</header>
+
+<section id="how"><div class="wrap">
+  <div class="split">
+    <figure class="paint tall reveal"><img src="/static/landing/orrery.jpg" alt="Joseph Wright of Derby, A Philosopher Lecturing on the Orrery (c. 1766)" loading="lazy" style="object-position:55% 50%"><figcaption>Joseph Wright of Derby · The Orrery · c. 1766</figcaption></figure>
+    <div class="reveal">
+      <div class="kicker">How it works</div>
+      <h2>From a few seeds to a reading list.</h2>
+      <p class="big">You bring the papers you trust. Medicap builds the neighbourhood around them and ranks it, so you see the whole field without losing the thread.</p>
+      <a class="btn ghost" href="/app">Try it with the example seeds</a>
+    </div>
+  </div>
+  <div class="steps">
+    <div class="step reveal"><div class="n">01</div><h3>Resolve your seeds</h3><p>DOIs, doi.org links, PMIDs or titles are matched against OpenAlex. Ambiguous titles ask you to pick.</p></div>
+    <div class="step reveal"><div class="n">02</div><h3>Expand</h3><p>References and citing works of every seed, a literature search on your question, and a Tavily scholarly-web search.</p></div>
+    <div class="step reveal"><div class="n">03</div><h3>Rank, out loud</h3><p>Graph, semantic and optional LLM-judge signals combine into a 1–100% score with adjustable weights.</p></div>
+    <div class="step reveal"><div class="n">04</div><h3>Decide &amp; export</h3><p>Accept or reject, see retraction flags, and export Markdown, BibTeX or RIS.</p></div>
+  </div>
+</div></section>
+
+<section id="explain"><div class="wrap">
+  <div class="split rev">
+    <figure class="paint tall reveal"><img src="/static/landing/airpump.jpg" alt="Joseph Wright of Derby, An Experiment on a Bird in the Air Pump (1768)" loading="lazy" style="object-position:50% 45%"><figcaption>Joseph Wright of Derby · An Experiment on a Bird in the Air Pump · 1768</figcaption></figure>
+    <div class="reveal">
+      <div class="kicker">Transparency</div>
+      <h2>Every result explains itself.</h2>
+      <p class="big">Each paper shows which seed it cites or is cited by, what it found through search or the web, and how every signal adds up to its score. Supporting web sources and a figure from the paper sit right next to it.</p>
+      <div class="feat" style="grid-template-columns:1fr 1fr">
+        <div><b>Provenance</b><span>Citation paths back to your seeds</span></div>
+        <div><b>Score breakdown</b><span>Graph · semantic · judge, re-weightable</span></div>
+        <div><b>Web context</b><span>Tavily background and supporting sources</span></div>
+        <div><b>Retraction flags</b><span>Warned before you accept</span></div>
+      </div>
+    </div>
+  </div>
+  <figure class="paint wide band reveal"><img src="/static/landing/bookworm.jpg" alt="Carl Spitzweg, The Bookworm (c. 1850)" loading="lazy" style="object-position:50% 22%"><div class="over">A library belongs to everyone who walks in. Medicap helps you find the shelf you didn’t know to look for.</div></figure>
+</div></section>
+
+<section id="evaluate"><div class="wrap">
+  <div class="split">
+    <figure class="paint tall reveal"><img src="/static/landing/astronomer.jpg" alt="Johannes Vermeer, The Astronomer (c. 1668)" loading="lazy"><figcaption>Johannes Vermeer · The Astronomer · c. 1668</figcaption></figure>
+    <div class="reveal">
+      <div class="kicker">Evaluation</div>
+      <h2>Measured on your own seeds.</h2>
+      <p class="big">Medicap hides each seed in turn, ranks the field with the others, and records where the hidden paper lands for every channel. Recall@5, @10 and @20 come straight from that table, so you can see when the hybrid ranking beats plain keyword search.</p>
+      <a class="btn primary" href="/app">Run an evaluation →</a>
+    </div>
+  </div>
+</div></section>
+
+<section class="quote reveal"><div class="wrap">
+  <div class="kicker">Our mission</div>
+  <blockquote>“Research should start from what you trust and end with what you can defend.”</blockquote>
+  <cite>Medicap: seed-based, explainable literature discovery</cite>
+</div></section>
+
+<div class="final wrap reveal">
+  <div class="kicker">Get started</div>
+  <h2>Paste three papers. See the field.</h2>
+  <div class="term">$ <b>open</b> medicap → paste DOIs → <b>Run discovery</b></div><br>
+  <a class="btn primary" href="/app">Open the dashboard →</a>
+</div>
+
+<footer><div class="wrap">
+  <span>Medicap · data from OpenAlex, web context from Tavily</span>
+  <span>Paintings: Rembrandt, Wright of Derby, Spitzweg and Vermeer. Public domain, via <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a>.</span>
+</div></footer>
+
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll(".reveal,.paint").forEach(el=>io.observe(el));
+const nav=document.getElementById("nav");addEventListener("scroll",()=>nav.classList.toggle("scrolled",scrollY>8),{passive:true});
+</script>
+</body>
+</html>
