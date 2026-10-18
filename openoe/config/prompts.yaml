@@ -153,6 +153,7 @@ generate_answer_v4: |
   ## Style
   - Clear professional language, compact sentences, Markdown headings (##, ###) and lists.
   - Answer in the language the question was asked in (e.g. German question -> German answer); keep drug names, trial names and numbers unchanged.
+  - Doses and dose-adjustment criteria: state them only as written in the cited sources, with every criterion; never reconstruct them from memory. If the sources do not give them, say so and point to the prescribing information.
 
   ## Input
   ### Retrieved passages (JSON):
