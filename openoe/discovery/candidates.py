@@ -12,13 +12,21 @@ import httpx
 
 from openoe.discovery.models import Paper, normalize_doi, paper_from_work, short_openalex_id
 from openoe.discovery.openalex import OpenAlexClient
-from openoe.discovery.pubmed import search_pubmed
+from openoe.discovery.pubmed import lookup_pubmed, search_pubmed
 from openoe.discovery.seeds import parse_seed
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
 
 log = logging.getLogger(__name__)
 _DOI_RE = re.compile(r"10\.\d{4,9}/[^\s\"<>]+", re.I)
+
+
+_PUBMED_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
+_SCHOLARLY_DOMAINS = [
+    "pubmed.ncbi.nlm.nih.gov", "pmc.ncbi.nlm.nih.gov", "doi.org", "nejm.org", "thelancet.com",
+    "jamanetwork.com", "bmj.com", "nature.com", "sciencedirect.com", "springer.com", "wiley.com",
+    "ascopubs.org", "ahajournals.org", "medrxiv.org", "biorxiv.org", "cochranelibrary.com",
+]
 
 
 def _enabled(cfg: Dict[str, Any], signal_type: str) -> bool:
@@ -203,45 +211,76 @@ async def gather_candidates(
             for paper in papers:
                 add_paper(paper, {"type": "search", "query": query, "source": "pubmed"})
 
+    async def _tavily(session: httpx.AsyncClient, key: str, query: str, **extra: Any) -> List[Dict[str, Any]]:
+        response = await session.post(
+            "https://api.tavily.com/search",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"query": query, "max_results": 8, "search_depth": "basic", **extra},
+        )
+        response.raise_for_status()
+        return response.json().get("results", [])
+
     async def web_search() -> None:
+        """Tavily agentic search: general results become web context; scholarly hits are resolved
+        to DOIs/PMIDs (OpenAlex, then PubMed) and ranked like any other candidate."""
         nonlocal web_context
         if not _enabled(cfg, "web"):
             return
         key = os.getenv("TAVILY_API_KEY", "")
         if not key:
             return
-        query = question.strip() or " ".join(paper.title for paper in seeds) + " research"
+        topic = question.strip() or " ".join(paper.title for paper in seeds)
         try:
             async with httpx.AsyncClient(timeout=30.0) as session:
-                response = await session.post(
-                    "https://api.tavily.com/search",
-                    headers={"Authorization": f"Bearer {key}"},
-                    json={"query": query, "max_results": 8, "search_depth": "basic"},
+                general, scholarly = await asyncio.gather(
+                    _tavily(session, key, topic + " research"),
+                    _tavily(session, key, topic + " study", include_domains=_SCHOLARLY_DOMAINS),
+                    return_exceptions=True,
                 )
-                response.raise_for_status()
-                data = response.json()
-            results = data.get("results", [])
+            if isinstance(general, Exception):
+                raise general
+            if isinstance(scholarly, Exception):
+                errors.append(f"Tavily scholarly search: {scholarly}")
+                scholarly = []
             web_context = [
                 {
                     "title": str(item.get("title") or ""),
                     "url": str(item.get("url") or ""),
                     "snippet": str(item.get("content") or "")[:300],
                 }
-                for item in results
+                for item in general
             ]
             dois: List[str] = []
-            doi_urls: Dict[str, str] = {}
-            for item in results:
-                text = f"{item.get('url', '')} {item.get('content', '')}"
+            pmids: List[str] = []
+            found_urls: Dict[str, str] = {}
+            for item in [*scholarly, *general]:
+                url = str(item.get("url") or "")
+                text = f"{url} {item.get('content') or ''}"
+                pmid_match = _PUBMED_URL_RE.search(url)
+                if pmid_match:
+                    pmids.append(pmid_match.group(1))
+                    found_urls.setdefault("pmid:" + pmid_match.group(1), url)
                 for match in _DOI_RE.findall(text):
                     doi = match.rstrip(".,;:!?)]}>\"'")
                     if doi:
                         dois.append(doi)
-                        doi_urls.setdefault(doi.lower(), str(item.get("url") or ""))
-            for work in await client.by_dois(dois):
-                doi = normalize_doi(work.get("doi"))
-                url = doi_urls.get((doi or "").lower(), "")
-                add_work(work, {"type": "web", "url": url})
+                        found_urls.setdefault(doi.lower(), url)
+            dois = list(dict.fromkeys(dois))[:20]
+            pmids = list(dict.fromkeys(pmids))[:20]
+            resolved_dois: Set[str] = set()
+            if dois:
+                for work in await client.by_dois(dois):
+                    doi = normalize_doi(work.get("doi"))
+                    resolved_dois.add((doi or "").lower())
+                    add_work(work, {"type": "web", "url": found_urls.get((doi or "").lower(), "")})
+            if client.rate_limited or len(resolved_dois) < len(dois) or pmids:
+                for kind, value in [*(("doi", d) for d in dois if d.lower() not in resolved_dois), *(("pmid", p) for p in pmids)]:
+                    try:
+                        paper = await lookup_pubmed(kind, value)
+                    except Exception:
+                        paper = None
+                    if paper:
+                        add_paper(paper, {"type": "web", "url": found_urls.get(value.lower() if kind == "doi" else "pmid:" + value, ""), "source": "pubmed"})
         except Exception as exc:
             message = f"Tavily search: {exc}"
             log.warning("%s", message)

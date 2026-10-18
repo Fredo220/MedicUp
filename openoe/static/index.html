@@ -598,7 +598,6 @@ function filtersHtml(m,n,tot){
    <select class="fchip${f.year?" on":""}" data-f="year" data-mid="${m.id}">${yrs.map(y=>`<option value="${y}"${f.year===y?" selected":""}>${y?"Since "+y:"Any year"}</option>`).join("")}</select>
    <select class="fchip${f.design?" on":""}" data-f="design" data-mid="${m.id}"><option value="">Any study design</option><option value="__clin"${f.design==="__clin"?" selected":""}>Clinical studies only</option>${designs.filter(d=>d!=="unclear").map(d=>`<option value="${esc(d)}"${f.design===d?" selected":""}>${esc(dLabel(d))}</option>`).join("")}</select>
    <button class="fchip${f.oa?" on":""}" data-f="oa" data-mid="${m.id}">Open access</button>
-   <button class="fchip${f.ver?" on":""}" data-f="ver" data-mid="${m.id}">Verified quote</button>
    <button class="fchip${f.hide?" on":""}" data-f="hide" data-mid="${m.id}">Hide rejected</button>
    <span class="fcount">${n} of ${tot}${prefs.wOn?" · custom ranking":""}</span></div>`;
 }
@@ -611,7 +610,6 @@ function paperHtml(m,p){
   const authors=Array.isArray(p.authors)?p.authors.join(", "):(p.authors||"");
   const tags=[p.is_retracted&&`<span class="tg bad">Retracted</span>`,p.study_design&&p.study_design!=="unclear"&&`<span class="tg ${DESIGN[p.study_design]||""}" title="Study design as stated in the abstract (AI-extracted)">${esc(dLabel(p.study_design))}</span>`,p.type==="review"&&p.study_design!=="narrative review"&&p.study_design!=="systematic review"&&`<span class="tg">Review</span>`,p.is_oa&&`<span class="tg ok">Open access</span>`,p.topic&&`<span class="tg" title="${esc(p.field||"")}">${esc(p.topic)}</span>`].filter(Boolean).join("");
   const rel=(p.related_seeds||[]).map(i=>"S"+(i+1)).join(", ");
-  const quote=p.quote&&p.quote_verified?`<div class="quote">“${esc(p.quote)}”<span class="v">${ic("check","sm")}Verified in abstract</span></div>`:`<div class="noquote">No quote could be verified in the abstract — read the abstract before relying on this.</div>`;
   const bar=(l,v,t)=>`<div>${l}</div><div class="track"><i style="width:${Math.round(Math.max(0,Math.min(1,v))*100)}%"></i></div><div class="v">${t}</div>`;
   const links=[L.doi&&["DOI",L.doi],L.pubmed&&["PubMed",L.pubmed],p.oa_url&&["Full text",p.oa_url],L.openalex&&["OpenAlex",L.openalex]].filter(Boolean).map(([l,h])=>`<a class="pa" href="${esc(h)}" target="_blank" rel="noopener">${ic("link","sm")}${l}</a>`).join("");
   return `<div class="paper${dec==="acc"?" acc":dec==="rej"?" rej":""}" id="p-${m.id}-${esc(id)}">
@@ -621,15 +619,14 @@ function paperHtml(m,p){
      ${tags?`<div class="tags">${tags}</div>`:""}</div>
      <div class="score" title="Match score (1–100%)"><b>${p._pct}%</b><small>match</small><div class="bar"><i style="width:${p._pct}%"></i></div></div></div>
    ${p.is_retracted?`<div class="retracted">${ic("warn","sm")}This paper has been retracted. Do not use it as evidence.</div>`:""}
-   <div class="why"><span class="l">Why it's here.</span> ${esc(p.why||"—")}${rel?` <span class="hint">Relates to ${rel}.</span>`:""}</div>
-   ${quote}
+   <div class="why"><span class="l">Why</span> ${esc(p.why||"—")}${rel?` <span class="hint">Relates to ${rel}.</span>`:""}</div>
    <div class="found">Found via ${(p.signals||[]).map(s=>`<span class="chip">${esc(sigLabel(s))}</span>`).join("")}</div>
    <details class="breakdown"${u.open.has("b"+id)?" open":""} data-key="b${esc(id)}" data-mid="${m.id}"><summary>${ic("right","sm")}Score breakdown</summary><div class="bd">
      ${bar("AI relevance",(c.llm_relevance??0)/10,`${c.llm_relevance??"–"}/10`)}${bar("Similarity",c.similarity??0,`${Math.round((c.similarity??0)*100)}%`)}${bar("Linked seeds",(c.seed_links??0)/nS,`${c.seed_links??0}/${nS}`)}${bar("Signals",Math.min(1,(c.n_signals??0)/3),`${c.n_signals??(p.signals||[]).length}`)}</div></details>
    <div class="pact">${links}<button class="pa" data-act="abs" data-mid="${m.id}" data-id="${esc(id)}">${ic("paper","sm")}Abstract</button><button class="pa" data-act="cite" data-mid="${m.id}" data-id="${esc(id)}">${ic("copy","sm")}Cite</button><span class="sp"></span>
      <button class="pa${dec==="acc"?" on-acc":""}" data-act="acc" data-mid="${m.id}" data-id="${esc(id)}" title="Keep: added to the reading list and used as a seed for the next search">${ic("check","sm")}${dec==="acc"?"Kept":"Keep"}</button>
      <button class="pa${dec==="rej"?" on-rej":""}" data-act="rej" data-mid="${m.id}" data-id="${esc(id)}" title="Not relevant; excluded on re-run">${ic("x","sm")}${dec==="rej"?"Rejected":"Reject"}</button></div>
-   <div class="abstract${u.open.has("a"+id)?" open":""}">${p.abstract?hlQuote(p.abstract,p.quote_verified?p.quote:""):"No abstract available."}</div></div>`;
+   <div class="abstract${u.open.has("a"+id)?" open":""}">${p.abstract?esc(p.abstract):"No abstract available."}</div></div>`;
 }
 /* ---------- citation graph (Medicap design): seeds in a middle row, ranked papers branch above/below on curved links; each point carries a figure card ---------- */
 const FIG={},FIGREQ=new Set(),GMAX=30;
@@ -735,7 +732,6 @@ function traceHtml(m,secs){
    <div>Seed papers</div><div>${(d.seeds||[]).length} resolved${(d.unresolved||[]).length?`, ${d.unresolved.length} not found`:""}</div>
    <div>Candidates</div><div>${st.n_candidates??"–"} (${Object.entries(st.signals||{}).map(([k,v])=>`${esc(SIG[k]||k)} ${v}`).join(" · ")})</div>
    <div>AI-checked</div><div>${st.n_judged??"–"} top candidates</div>
-   <div>Verified quotes</div><div>${(d.results||[]).filter(p=>p.quote_verified).length} of ${(d.results||[]).length}</div>
    ${stages}<div>Total</div><div>${secs}s</div>
    <div>Sources</div><div>OpenAlex · PubMed · Semantic Scholar · Tavily · Nebius Token Factory</div>
    ${(d.errors||[]).length?`<div>Errors</div><div>${d.errors.map(e=>esc(String(e).slice(0,160))).join("<br>")}</div>`:""}</div>`;
