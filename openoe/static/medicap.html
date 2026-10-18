@@ -174,7 +174,11 @@ pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);bord
 #graph.focus .node:not(.hot){opacity:.25}
 #graph .drop{fill:var(--accent);stroke:var(--surface);stroke-width:1.5;pointer-events:none}
 #graph .node{cursor:pointer;opacity:0;animation:pop .5s cubic-bezier(.2,1.4,.4,1) forwards;transition:opacity .2s}
-#graph .bob{animation:bob var(--bd,5s) ease-in-out infinite alternate}
+#graph .bob{animation:none}
+#graph .glow{fill:none;stroke:#7fd3ff;stroke-width:5;stroke-linecap:round;stroke-dasharray:.16 1.3;stroke-dashoffset:1.16;opacity:0;pointer-events:none;filter:drop-shadow(0 0 4px #3aa0ff)}
+#graph .glow.once{animation:sweep 1.8s cubic-bezier(.65,0,.35,1) both}
+#graph .glow.loop{animation:sweep 1.6s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes sweep{0%{stroke-dashoffset:1.16;opacity:0}12%{opacity:.95}88%{opacity:.95}100%{stroke-dashoffset:0;opacity:0}}
 #graph .dot{transition:r .2s}
 #graph .card rect.bg{fill:var(--surface);stroke-width:2;transition:stroke-width .2s}
 #graph .card rect.ph{fill:var(--border)}
@@ -193,7 +197,7 @@ pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);bord
 @keyframes flow{from{stroke-dashoffset:.065}to{stroke-dashoffset:0}}
 @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes bob{from{transform:translateY(-2.5px)}to{transform:translateY(2.5px)}}
-@media (prefers-reduced-motion:reduce){#graph .edge,#graph .node,#graph .bob{animation:none;stroke-dashoffset:0;opacity:1}#graph .drop{display:none}}
+@media (prefers-reduced-motion:reduce){#graph .edge,#graph .node,#graph .bob{animation:none;stroke-dashoffset:0;opacity:1}#graph .drop,#graph .glow{display:none}}
 #graph text{font:10px var(--mono);fill:var(--muted)}
 .gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:4px;max-width:280px;opacity:0;transition:opacity .12s}
 
@@ -616,7 +620,7 @@ function renderGraph(animate=true){
   let h=`<g class="edges">`;
   shown.forEach((p,i)=>{const pr=primary(p);(p.sl||[]).forEach(n=>{if(!pos["S"+n])return;
     h+=`<path class="edge${n===pr?" main":""}" pathLength="1" d="${curve(pos["S"+n],pos[p.id])}" data-e="${esc(p.id)}" data-es="${n}" style="${an((.15+i*.035).toFixed(2))}"/>`})});
-  h+=`</g><g class="drops"></g>`;
+  h+=`</g><g class="glows">${animate?shown.map((p,i)=>{const pr=primary(p);return pr&&pos["S"+pr]?`<path class="glow once" pathLength="1" d="${curve(pos["S"+pr],pos[p.id])}" style="animation-delay:${(.25+i*.05).toFixed(2)}s"/>`:""}).join(""):""}</g><g class="drops"></g>`;
   /* a node = small dot + (hidden until its image loads) figure card on a short stem, above or below the dot */
   const node=(k,fid,x,y,r,col,label,up,big,delay,data)=>{
     const cw=big?96:72,ch=big?68:52,gap=r+10,cy=up?y-gap-ch:y+gap,cx=x-cw/2,ly=up?y+r+12:y-r-5;
@@ -649,7 +653,7 @@ function setFocus(c){
   $$("#graph .node").forEach(n=>{n.classList.toggle("hot",!!c&&(n===c||linked.has(n.dataset.p||"S"+n.dataset.s)));n.classList.toggle("cur",n===c)});
   /* fluid: droplets travel each lit branch from the seed out to the paper */
   if(!matchMedia("(prefers-reduced-motion:reduce)").matches)
-    drops.innerHTML=hot.slice(0,40).map((l,i)=>`<circle class="drop" r="3.5"><animateMotion dur="1.8s" begin="${(i*.06).toFixed(2)}s" repeatCount="indefinite" path="${l.getAttribute("d")}" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".45 0 .55 1"/></circle>`).join("");
+    drops.innerHTML=hot.slice(0,40).map((l,i)=>`<path class="glow loop" pathLength="1" d="${l.getAttribute("d")}" style="animation-delay:${(i*.08).toFixed(2)}s"/>`).join("");
 }
 let focusTimer;
 $("#graph").addEventListener("mousemove",e=>{
