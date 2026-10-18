@@ -9,6 +9,7 @@ from openoe.discovery.rank import (
     calculate_final_score,
     calculate_pre_score,
     parse_judge_json,
+    reconcile_study_design,
     score_to_pct,
     verify_quote,
 )
@@ -34,10 +35,13 @@ def test_parse_seed_pmid_and_pubmed_url():
         "pmid",
         "12345678",
     )
+    for seed in ("PMID 20525992", "PMID: 20525992", "pmid:20525992", "PMID20525992"):
+        assert parse_seed(seed) == ("pmid", "20525992")
 
 
 def test_parse_seed_openalex_and_title():
     assert parse_seed("W123456789") == ("openalex", "W123456789")
+    assert parse_seed("openalex:W123") == ("openalex", "W123")
     assert parse_seed("https://openalex.org/W123456789") == ("openalex", "W123456789")
     assert parse_seed("A study title") == ("title", "A study title")
 
@@ -119,6 +123,20 @@ def test_judge_study_design_is_normalized_and_defaults_to_unclear():
     assert parse_judge_json('{"study_design":"rct"}')["study_design"] == "RCT"
     assert parse_judge_json('{"study_design":"banana"}')["study_design"] == "unclear"
     assert parse_judge_json('{"relevance":5}')["study_design"] == "unclear"
+
+
+def test_reconcile_study_design_corrects_randomized_trial_labels():
+    assert reconcile_study_design(
+        "non-randomized trial",
+        "LBA47 … Primary analysis of the randomized phase II NIBIT-ML1 study",
+        "",
+    ) == "RCT"
+    assert reconcile_study_design(
+        "non-randomized trial", "A non-randomized phase II study", "",
+    ) == "non-randomized trial"
+    assert reconcile_study_design(
+        "cohort", "A randomized cohort study", "",
+    ) == "cohort"
 
 
 def test_score_pct_is_rounded_and_clamped():

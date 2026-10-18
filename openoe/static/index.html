@@ -457,7 +457,7 @@ function updateComposer(){
   const n=seedList().length;
   $("seedToolLbl").textContent=n?`${n} seed paper${n>1?"s":""}`:"Seed papers";
   $("seedTool").classList.toggle("on",n>0||$("seedbox").classList.contains("open"));
-  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()?"Ask a follow-up about these papers…":prefs.mode==="discover"?"Research question — add seed papers with +":"How can I help you today?";
+  input.placeholder=n?"Research question (optional) — then press Enter to discover":hasDiscovery()&&prefs.mode==="discover"?"Ask a follow-up about these papers…":prefs.mode==="discover"?"Research question — add seed papers with +":"How can I help you today?";
   $("sendBtn").disabled=busy||(!input.value.trim()&&!n);
 }
 function autosize(){input.style.height="auto";input.style.height=Math.min(input.scrollHeight,220)+"px";}
@@ -468,7 +468,7 @@ $("composer").addEventListener("submit",e=>{e.preventDefault();if(busy)return;
   const q=input.value.trim(),seeds=seedList();
   if(seeds.length)return startDiscover(q,seeds);
   if(!q)return;
-  if(hasDiscovery())return startFollowup(q);
+  if(hasDiscovery()&&prefs.mode==="discover")return startFollowup(q);
   if(prefs.mode==="discover"){openSeeds(true);toast("Add at least one seed paper, or switch to MedicUp Ask");return;}
   startAsk(q);
 });

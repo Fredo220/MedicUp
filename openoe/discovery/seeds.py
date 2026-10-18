@@ -32,6 +32,12 @@ def parse_seed(seed: str) -> Tuple[str, str]:
         match = re.search(r"/(W\d+)(?:/|$)", parsed.path, flags=re.I)
         if match:
             return "openalex", match.group(1).upper()
+    pmid_match = re.fullmatch(r"pmid\s*:?\s*(\d+)", value, re.I)
+    if pmid_match:
+        return "pmid", pmid_match.group(1)
+    openalex_match = re.fullmatch(r"openalex\s*:?\s*(W\d+)", value, re.I)
+    if openalex_match:
+        return "openalex", openalex_match.group(1).upper()
     if re.fullmatch(r"\d+", value):
         return "pmid", value
     if re.fullmatch(r"W\d+", value, flags=re.I):

@@ -15,6 +15,8 @@ from openoe.llm.prompts import PromptManager
 
 log = logging.getLogger(__name__)
 _BARE_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
+_RANDOMIZED_RE = re.compile(r"(?<!non-)(?<!non )\brandomi[sz]ed\b", re.I)
+_NON_RANDOMIZED_RE = re.compile(r"\bnon[- ]?randomi[sz]ed\b", re.I)
 _STUDY_DESIGNS = (
     "meta-analysis",
     "systematic review",
@@ -41,6 +43,15 @@ def normalize_study_design(value: Any) -> str:
         (design for design in _STUDY_DESIGNS if design.casefold() == normalized),
         "unclear",
     )
+
+
+def reconcile_study_design(design: str, title: str, abstract: str) -> str:
+    if design != "non-randomized trial":
+        return design
+    text = f"{title} {abstract}"
+    if _RANDOMIZED_RE.search(text) and not _NON_RANDOMIZED_RE.search(text):
+        return "RCT"
+    return design
 
 
 def score_to_pct(score: float) -> int:
@@ -311,7 +322,9 @@ async def rank_candidates(
             "quote": judged["quote"],
             "quote_verified": verify_quote(judged["quote"], paper.abstract),
             "related_seeds": judged["related_seeds"],
-            "study_design": judged["study_design"],
+            "study_design": reconcile_study_design(
+                judged["study_design"], paper.title, paper.abstract,
+            ),
             "signals": entry["signals"],
         })
     results.sort(key=lambda entry: entry["score"], reverse=True)
