@@ -248,14 +248,42 @@ mark{background:color-mix(in srgb,var(--ok) 22%,transparent);color:inherit;borde
 .cbar{height:4px;border-radius:2px;background:var(--border);margin:6px 0 4px;overflow:hidden}.cbar i{display:block;height:100%;background:var(--text)}
 .kv{display:grid;grid-template-columns:200px 1fr;gap:6px 14px;font-size:13px}
 .kv div:nth-child(odd){color:var(--muted)}
-.mapwrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--bg)}
-.mapwrap svg{width:100%;display:block}
-.maplegend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--border)}
-.maplegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-.edge{fill:none;stroke:var(--border2);stroke-width:1.3;transition:stroke .2s,stroke-width .2s}
-.edge.lit{stroke:var(--link);stroke-width:2;stroke-dasharray:6 6;animation:flow 0.9s linear infinite}
-@keyframes flow{to{stroke-dashoffset:-12}}
-.node{cursor:pointer}.node text{pointer-events:none}
+/* citation graph (Medicap design) */
+.gmap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--bg);position:relative}
+.gmap-h{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.gmap-h i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+.gmap-h b{color:var(--text);font-weight:500}
+.gmap-h .linkbtn{margin-left:auto}
+.gmap svg.graph{display:block;width:100%;height:auto}
+.gmap .edge{pointer-events:none;fill:none;stroke:var(--border2);stroke-width:.8;stroke-opacity:.45;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:gdraw 1.1s cubic-bezier(.3,.7,.3,1) forwards;transition:stroke-opacity .2s,opacity .2s}
+.gmap .edge.main{stroke-width:1.2;stroke-opacity:.8;stroke:color-mix(in srgb,var(--link) 28%,var(--border2))}
+.gmap .edge.hot{stroke:color-mix(in srgb,var(--link) 45%,var(--bg));stroke-width:1.6;stroke-opacity:.9;opacity:1;stroke-dasharray:none;stroke-dashoffset:0;animation:none}
+.gmap svg.focus .edge:not(.hot){opacity:.08}
+.gmap svg.focus .node:not(.hot){opacity:.25}
+.gmap .node{cursor:pointer;opacity:0;animation:gpop .5s cubic-bezier(.2,1.4,.4,1) forwards;transition:opacity .2s}
+.gmap .node text{pointer-events:none}
+.gmap .glow{fill:none;stroke:#bfe3ff;stroke-width:3;stroke-linecap:round;stroke-dasharray:.16 1.3;stroke-dashoffset:1.16;opacity:0;pointer-events:none;filter:drop-shadow(0 0 2px rgba(120,180,255,.45))}
+.gmap .glow.once{animation:gsweep 1.8s cubic-bezier(.65,0,.35,1) both}
+.gmap .glow.loop{animation:gsweep 1.6s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes gsweep{0%{stroke-dashoffset:1.16;opacity:0}15%{opacity:.6}85%{opacity:.6}100%{stroke-dashoffset:0;opacity:0}}
+.gmap .dot{transition:r .2s;fill-opacity:.85}
+.gmap .card{transform-box:view-box;transition:transform .25s cubic-bezier(.2,1.2,.4,1)}
+.gmap .card rect.bg{fill:var(--bg);stroke-width:2;stroke-opacity:.55;transition:stroke-width .2s,stroke-opacity .35s}
+.gmap .card rect.ph{fill:var(--border)}
+.gmap .card image{opacity:0;transition:filter .35s,opacity .35s}
+.gmap .card.ready image{filter:blur(5px) grayscale(.5);opacity:.45}
+.gmap .node.hot .card.ready image{filter:none;opacity:1}
+.gmap .node:not(.hot) .card rect.bg{stroke-opacity:.35}
+.gmap .node.hot .card rect.bg{stroke-width:1.2;stroke-opacity:.6}
+.gmap .node.cur .card{transform:scale(1.8)}
+.gmap .stem{stroke-width:1.2;stroke-dasharray:2 2}
+.gmap .rk{font:600 10px var(--sans,Inter,system-ui);fill:var(--muted);text-anchor:middle}
+.gmap .node.hot .rk{fill:var(--text)}
+.gmap .sl{font:700 11px var(--sans,Inter,system-ui);fill:var(--text);text-anchor:middle}
+@keyframes gdraw{to{stroke-dashoffset:0}}
+@keyframes gpop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.gmap .edge,.gmap .node{animation:none;stroke-dashoffset:0;opacity:1}.gmap .glow{display:none}}
+.gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:8px;max-width:280px;opacity:0;transition:opacity .12s;z-index:2}
 /* drawer & modal */
 .drawer{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100%;background:var(--panel);border-left:1px solid var(--border2);z-index:40;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.08)}
 .drawer.open{transform:none}
@@ -595,19 +623,98 @@ function paperHtml(m,p){
      <button class="pa${dec==="rej"?" on-rej":""}" data-act="rej" data-mid="${m.id}" data-id="${esc(id)}" title="Not relevant; excluded on re-run">${ic("x","sm")}${dec==="rej"?"Rejected":"Reject"}</button></div>
    <div class="abstract${u.open.has("a"+id)?" open":""}">${p.abstract?hlQuote(p.abstract,p.quote_verified?p.quote:""):"No abstract available."}</div></div>`;
 }
+/* ---------- citation graph (Medicap design): seeds in a middle row, ranked papers branch above/below on curved links; each point carries a figure card ---------- */
+const FIG={},FIGREQ=new Set(),GMAX=30;
+const ghash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296};
+function gLinks(p,nSeeds){const s=new Set();(p.signals||[]).forEach(g=>(g.seeds||[]).forEach(k=>s.add(k)));(p.related_seeds||[]).forEach(k=>s.add(k));return [...s].filter(k=>k>=0&&k<nSeeds);}
+function gTie(p,n){const sig=(p.signals||[]);const direct=sig.some(g=>(g.type==="cites_seeds"||g.type==="cited_by_seeds")&&(g.seeds||[]).includes(n))?5:0;const shared=sig.some(g=>g.type==="related"&&(g.seeds||[]).includes(n))?1:0;return direct+shared+ghash(p.openalex_id+n)*.5;}
 function mapHtml(m,list){
-  const seeds=m.data.seeds||[],res=list.slice(0,24),W=960,H=560,midY=H/2,dark=document.documentElement.dataset.theme==="dark";
-  if(!res.length)return `<div class="hint">Nothing to map.</div>`;
-  const sx=seeds.map((_,i)=>W*(i+1)/(seeds.length+1));
-  const pts=res.map((p,i)=>{const up=i%2===0,col=Math.floor(i/2),cols=Math.ceil(res.length/2);const x=60+(W-120)*(cols>1?col/(cols-1):.5);const dist=90+(1-(p._pct/100))*150+(col%2)*36;return {x,y:up?midY-dist:midY+dist,p};});
-  const link=p=>{const s=new Set();(p.signals||[]).forEach(g=>(g.seeds||[]).forEach(k=>s.add(k)));(p.related_seeds||[]).forEach(k=>s.add(k));return [...s].filter(k=>k<seeds.length);};
-  const colr=p=>p.is_retracted?"#ef4444":(p.signals||[]).some(s=>s.type==="web")?"#f59e0b":link(p).length?(dark?"#e5e5e5":"#171717"):"#60a5fa";
-  let edges="",nodes="";
-  pts.forEach(({x,y,p},i)=>{const ls=link(p);(ls.length?ls:[...seeds.keys()].slice(0,1)).forEach(k=>{const x0=sx[k],y0=midY;edges+=`<path class="edge" data-e="${i}" data-s="${k}" d="M${x0},${y0} C${x0},${(y0+y)/2} ${x},${(y0+y)/2} ${x},${y}"${ls.length?"":` stroke-dasharray="3 4"`}/>`;});
-    const r=6+p._pct/100*8;nodes+=`<g class="node" data-n="${i}" data-id="${esc(p.openalex_id)}" data-mid="${m.id}"><circle cx="${x}" cy="${y}" r="${r}" fill="${colr(p)}"/><text x="${x}" y="${y+(y<midY?-r-6:r+14)}" text-anchor="middle" font-size="11" fill="${dark?"#9b9b9b":"#737373"}">${p._rank}</text><title>#${p._rank} ${esc(p.title)} (${p.year||""}) · ${p._pct}%</title></g>`;});
-  seeds.forEach((s,i)=>{nodes+=`<g class="node" data-seed="${i}"><rect x="${sx[i]-22}" y="${midY-14}" width="44" height="28" rx="14" fill="${dark?"#ffffff":"#171717"}"/><text x="${sx[i]}" y="${midY+4}" text-anchor="middle" font-size="12" font-weight="600" fill="${dark?"#171717":"#ffffff"}">S${i+1}</text><title>S${i+1} ${esc(s.title)}</title></g>`;});
-  return `<div class="mapwrap" data-map="${m.id}"><svg viewBox="0 0 ${W} ${H}">${edges}${nodes}</svg><div class="maplegend"><span><i style="background:${dark?"#e5e5e5":"#171717"}"></i>Linked to seeds by citations</span><span><i style="background:#60a5fa"></i>Similarity / search / recommendation</span><span><i style="background:#f59e0b"></i>Web</span><span><i style="background:#ef4444"></i>Retracted</span><span>Closer to the seeds = higher match · hover to trace · click to open</span></div></div>`;
+  const u=U(m),animate=!u.mapShown;u.mapShown=true;
+  const seeds=m.data.seeds||[],shown=list.slice(0,GMAX);
+  if(!shown.length)return `<div class="hint">Nothing to map.</div>`;
+  const W=1000,H=900,mid=H/2,pos={},q=!seeds.length;
+  const row=q?[{title:m.req?.question||"Research question",q:true}]:seeds;
+  const sx=i=>row.length===1?W/2:110+i*(W-220)/(row.length-1);
+  row.forEach((s,i)=>pos["S"+i]=[sx(i),mid+(i%2?16:-16)]);
+  const sl=p=>q?[0]:gLinks(p,seeds.length);
+  const primary=p=>{const c=sl(p).filter(n=>pos["S"+n]);return c.length?c.reduce((a,b)=>gTie(p,a)>=gTie(p,b)?a:b):null};
+  const halves=[[],[]];shown.forEach((p,i)=>halves[i%2].push(p));
+  halves.forEach((hs,side)=>{
+    hs.sort((a,b)=>{const pa=primary(a),pb=primary(b);return (pa!=null?pos["S"+pa][0]:W/2)-(pb!=null?pos["S"+pb][0]:W/2)||ghash(a.openalex_id)-ghash(b.openalex_id)});
+    hs.forEach((p,i)=>{const x=50+(i+.5)*(W-100)/hs.length+(ghash(p.openalex_id+"x")-.5)*10;const dy=125+(i%3)*88+(ghash(p.openalex_id+"y")-.5)*18;pos[p.openalex_id]=[x,side?mid+dy:mid-dy];});
+  });
+  const curve=([x1,y1],[x2,y2])=>{const my=(y1+y2)/2,bend=(ghash(x2+":"+y2)-.5)*70;return `M${x1},${y1} C${x1+bend},${my} ${x2-bend},${my} ${x2},${y2}`};
+  const an=d=>animate?`animation-delay:${d}s`:"animation-duration:0s";
+  let h=`<g class="edges">`;
+  shown.forEach((p,i)=>{const pr=primary(p);const links=sl(p).filter(n=>pos["S"+n]);(links.length?links:[]).forEach(n=>{
+    h+=`<path class="edge${n===pr?" main":""}" pathLength="1" d="${curve(pos["S"+n],pos[p.openalex_id])}" data-e="${esc(p.openalex_id)}" data-es="${n}" style="${an((.15+i*.035).toFixed(2))}"/>`})});
+  h+=`</g><g class="glows">${animate?shown.map((p,i)=>{const pr=primary(p);return pr!=null&&pos["S"+pr]?`<path class="glow once" pathLength="1" d="${curve(pos["S"+pr],pos[p.openalex_id])}" style="animation-delay:${(.25+i*.05).toFixed(2)}s"/>`:""}).join(""):""}</g><g class="drops"></g>`;
+  const node=(k,fid,x,y,r,col,label,up,big,delay,data)=>{
+    const cw=big?96:72,ch=big?68:52,gap=r+10,cy=up?y-gap-ch:y+gap,cx=x-cw/2,ly=up?y+r+12:y-r-5;
+    return `<g class="node" ${data} data-fid="${esc(fid)}" style="${an(delay)}"><g class="bob" style="--bd:${(4+ghash(k)*3).toFixed(2)}s">
+      <g class="card" style="display:none;transform-origin:${x}px ${up?cy+ch:cy}px">
+        <line class="stem" x1="${x}" y1="${up?y-r:y+r}" x2="${x}" y2="${up?cy+ch:cy}" stroke="${col}"/>
+        <rect class="bg" x="${cx-3}" y="${cy-3}" width="${cw+6}" height="${ch+6}" rx="7" stroke="${col}"/>
+        <rect class="ph" x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="5"/>
+        <image x="${cx}" y="${cy}" width="${cw}" height="${ch}" preserveAspectRatio="xMidYMid meet" referrerpolicy="no-referrer"/>
+      </g>
+      <circle class="dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="var(--bg)" stroke-width="2"/>
+      <text class="${k.startsWith("S")?"sl":"rk"}" x="${x}" y="${ly}">${label}</text></g></g>`};
+  row.forEach((s,i)=>{const[x,y]=pos["S"+i];h+=node("S"+i,s.q?"":s.openalex_id,x,y,10,"var(--text)",s.q?"Question":"Seed "+(i+1),i%2===0,true,(.05*i).toFixed(2),`data-s="${i}"`)});
+  shown.forEach((p,i)=>{const[x,y]=pos[p.openalex_id],dec=m.dec[p.openalex_id],rk=p._rank;
+    const col=p.is_retracted?"var(--bad)":dec==="acc"?"var(--ok)":"var(--link)";
+    h+=node(p.openalex_id,p.openalex_id,x,y,5+(p._pct/100)*4,col,"Rank "+rk,y<mid,rk<=10,(.35+i*.035).toFixed(2),`data-p="${esc(p.openalex_id)}"${dec==="rej"?' style="opacity:.3"':""}`)});
+  setTimeout(()=>{const g=document.querySelector(`.gmap[data-map="${m.id}"]`);if(g){paintFigures(g);loadFigures(m,shown,g);}},0);
+  return `<div class="gmap" data-map="${m.id}"><div class="gmap-h"><span><i style="background:var(--text)"></i><b>${q?"Question":"Seed N"}</b> = ${q?"your research question":"a paper you provided"} (middle row)</span><span><i style="background:var(--link)"></i><b>Rank N</b> = position in the ranked list</span><span><i style="background:var(--bad)"></i>flagged</span><span>dot size = score · branches = ${q?"relevance":"citation"} links · hover a dot to bring its chain and figures into focus</span><button class="linkbtn" data-replay="${m.id}">Replay</button></div><svg class="graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="Citation graph of seeds and candidates">${h}</svg><div class="gtip"></div></div>`;
 }
+async function loadFigures(m,shown,g){
+  const want=[...(m.data.seeds||[]).map(s=>({id:s.openalex_id,t:s.title,doi:s.doi||"",pmid:s.pmid||""})),...shown.map(p=>({id:p.openalex_id,t:p.title,doi:p.doi||"",pmid:p.pmid||""}))].filter(p=>p.id&&!(p.id in FIG)&&!FIGREQ.has(p.id));
+  if(!want.length)return;
+  want.forEach(p=>FIGREQ.add(p.id));
+  const batches=[];for(let i=0;i<want.length;i+=4)batches.push(want.slice(i,i+4));
+  await Promise.all(batches.map(async b=>{
+    try{const r=await fetch("/api/medicap/figures",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({papers:b})}).then(x=>x.json());Object.assign(FIG,r.figures||{});document.querySelectorAll(".gmap").forEach(paintFigures);}
+    catch(err){b.forEach(p=>FIGREQ.delete(p.id))}
+  }));
+}
+function paintFigures(g){
+  g.querySelectorAll(".node").forEach(n=>{
+    const f=FIG[n.dataset.fid],card=n.querySelector(".card");
+    if(!f||!f.url||!card||card.dataset.done)return;
+    card.dataset.done=1;
+    const img=card.querySelector("image");
+    img.addEventListener("load",()=>{card.style.display="";card.classList.add("ready")},{once:true});
+    img.addEventListener("error",()=>card.remove(),{once:true});
+    img.setAttribute("href","/api/medicap/img?u="+encodeURIComponent(f.url));
+  });
+}
+function gSetFocus(svg,c){
+  const key=c?(c.dataset.p||"S"+c.dataset.s):"";
+  if(key===(svg.dataset.hot||""))return;svg.dataset.hot=key;
+  svg.classList.toggle("focus",!!c);
+  const drops=svg.querySelector(".drops");drops.innerHTML="";
+  const edges=[...svg.querySelectorAll(".edge")];
+  const hot=edges.filter(l=>!!c&&(c.dataset.p?l.dataset.e===c.dataset.p:l.dataset.es===c.dataset.s));
+  edges.forEach(l=>l.classList.toggle("hot",hot.includes(l)));
+  const linked=new Set(hot.flatMap(l=>[l.dataset.e,"S"+l.dataset.es]));
+  svg.querySelectorAll(".node").forEach(n=>{n.classList.toggle("hot",!!c&&(n===c||linked.has(n.dataset.p||"S"+n.dataset.s)));n.classList.toggle("cur",n===c)});
+  if(!matchMedia("(prefers-reduced-motion:reduce)").matches)
+    drops.innerHTML=hot.slice(0,40).map((l,i)=>`<path class="glow loop" pathLength="1" d="${l.getAttribute("d")}" style="animation-delay:${(i*.08).toFixed(2)}s"/>`).join("");
+}
+let gFocusTimer;
+$("thread").addEventListener("mousemove",e=>{
+  const g=e.target.closest(".gmap");if(!g)return;
+  const svg=g.querySelector("svg.graph"),tip=g.querySelector(".gtip"),c=e.target.closest(".node");
+  const key=c?(c.dataset.p||"S"+c.dataset.s):"";
+  clearTimeout(gFocusTimer);
+  if(key!==(svg.dataset.hot||""))gFocusTimer=setTimeout(()=>gSetFocus(svg,c),c?110:350);
+  if(!c){tip.style.opacity=0;return}
+  const m=discById(g.dataset.map),box=g.getBoundingClientRect();
+  if(c.dataset.p){const p=papersOf(m).find(x=>x.openalex_id===c.dataset.p);if(!p)return;const f=FIG[p.openalex_id];tip.innerHTML=`<b>Rank ${p._rank}</b> · ${p._pct}% match<br><b>${esc(p.title)}</b><br>${p.year??"—"} · ${esc(p.venue||"")}${f&&f.desc?`<br><span style="opacity:.75">figure: ${esc(f.desc.slice(0,110))}</span>`:""}`}
+  else{const s=(m.data.seeds||[])[+c.dataset.s];tip.innerHTML=s?`<b>Seed ${+c.dataset.s+1}</b> (a paper you provided)<br>${esc(s.title)}`:`<b>Research question</b><br>${esc(m.req?.question||"")}`}
+  tip.style.left=Math.min(e.clientX-box.left+14,box.width-290)+"px";tip.style.top=(e.clientY-box.top+14)+"px";tip.style.opacity=1;
+});
+$("thread").addEventListener("mouseout",e=>{const g=e.target.closest(".gmap");if(!g||g.contains(e.relatedTarget))return;clearTimeout(gFocusTimer);gSetFocus(g.querySelector("svg.graph"),null);g.querySelector(".gtip").style.opacity=0;});
 function clustersHtml(m,list){
   const g={};list.forEach(p=>{const k=p.topic||p.field||"Other";(g[k]=g[k]||[]).push(p);});
   const ent=Object.entries(g).sort((a,b)=>b[1].length-a[1].length),max=Math.max(1,...ent.map(e=>e[1].length));
@@ -655,7 +762,8 @@ $("thread").addEventListener("click",e=>{
     if(cite.dataset.ask){const s=$(`s-${cite.dataset.ask}-${cite.dataset.n}`);if(s){s.scrollIntoView({behavior:"smooth",block:"center"});flash(s);}return;}
     const m=discById(cite.dataset.mid);if(!m)return;const p=sortedForFU(m)[+cite.dataset.n-1];if(p)gotoPaper(m,p.openalex_id);return;}
   const go=t.closest("[data-goto]");if(go){e.preventDefault();gotoPaper(discById(go.dataset.mid),go.dataset.goto);return;}
-  const node=t.closest(".node[data-id]");if(node){gotoPaper(discById(node.dataset.mid),node.dataset.id);return;}
+  const gn=t.closest(".gmap .node[data-p]");if(gn){gotoPaper(discById(gn.closest(".gmap").dataset.map),gn.dataset.p);return;}
+  const rp=t.closest("[data-replay]");if(rp){const m=discById(rp.dataset.replay);U(m).mapShown=false;rerender(m);return;}
   const b=t.closest("[data-act]");if(!b)return;const m=discById(b.dataset.mid);const id=b.dataset.id;
   switch(b.dataset.act){
     case "abs":{U(m).open.has("a"+id)?U(m).open.delete("a"+id):U(m).open.add("a"+id);const el=$(`p-${m.id}-${id}`);el&&el.querySelector(".abstract").classList.toggle("open");break;}
@@ -673,8 +781,6 @@ $("thread").addEventListener("click",e=>{
 });
 $("thread").addEventListener("change",e=>{const s=e.target.closest("select[data-f]");if(!s)return;const m=discById(s.dataset.mid);U(m).f[s.dataset.f]=s.dataset.f==="year"?+s.value:s.value;rerender(m);});
 $("thread").addEventListener("toggle",e=>{const d=e.target;if(d.matches&&d.matches("details[data-key]")){const m=discById(d.dataset.mid);d.open?U(m).open.add(d.dataset.key):U(m).open.delete(d.dataset.key);}},true);
-$("thread").addEventListener("mouseover",e=>{const n=e.target.closest(".node");const w=e.target.closest(".mapwrap");if(!w)return;w.querySelectorAll(".edge.lit").forEach(x=>x.classList.remove("lit"));if(!n)return;
-  if(n.dataset.n!=null)w.querySelectorAll(`.edge[data-e="${n.dataset.n}"]`).forEach(x=>x.classList.add("lit"));else w.querySelectorAll(`.edge[data-s="${n.dataset.seed}"]`).forEach(x=>x.classList.add("lit"));});
 function flash(el){el.classList.add("hl");setTimeout(()=>el.classList.remove("hl"),1800);}
 function gotoPaper(m,id){if(!m)return;const u=U(m);let need=u.tab!=="papers";if(!filtered(m).some(p=>p.openalex_id===id)){u.f={year:0,oa:false,ver:false,design:"",sort:u.f.sort,hide:false};need=true;}u.tab="papers";if(need)rerender(m);const el=$(`p-${m.id}-${id}`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});flash(el);}}
 
