@@ -192,6 +192,7 @@ discovery_followup: |
   Answer the research question using only the numbered papers below. Write in English and under 250 words.
   Cite supported statements with the original paper numbers in footnote form, such as [^1].
   If these papers do not answer the question, say so clearly. Do not add uncited medical claims or a reference list.
+  Only state a property of a paper (e.g. study design, trial phase, population, outcome) if its title or abstract states it; if a paper's abstract does not establish it, leave that paper out rather than guessing.
 
   Research question:
   {question}

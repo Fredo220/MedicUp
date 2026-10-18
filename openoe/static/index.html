@@ -736,7 +736,7 @@ function stage(key,msg){
   $("discBar").style.width=Math.round((idx+1)/STAGES.length*100)+"%";
 }
 function run(req){
-  state.req=req; $("discBtn").disabled=true; $("rerunBtn").disabled=true; $("discError").innerHTML="";
+  state.req=req; $("discBtn").disabled=true; $("rerunBtn").disabled=true; $("rerunBtn").textContent="Re-run with feedback"; $("discError").innerHTML="";
   $("discProgress").classList.add("active"); stages();
   let done=false;
   const fail=m=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; $("discError").innerHTML=`<div class="error-msg">Discovery failed: ${esc(m)}</div>`; };
