@@ -1,0 +1,68 @@
+# Open OE Lite
+
+retrieval:
+  routes:
+    openalex_kw:
+      enabled: true
+      source: openalex
+      mode: keyword
+      limit: 30
+      config:
+        base_url: "https://api.openalex.org"
+        email: "${OPENALEX_EMAIL:}"
+      filters:
+        date_range_years: 10
+
+merge:
+  papers:
+    strategy: rrf
+    rrf_k: 60
+    dedup: doi
+    total_limit: 80
+
+stages:
+  safety:
+    enabled: true
+    model: openai/gpt-oss-20b
+    provider: google-vertex
+
+  enhance:
+    hyde:
+      enabled: true
+      model: openai/gpt-oss-120b
+      provider: google-vertex
+    translate:
+      enabled: true
+      model: openai/gpt-oss-120b
+      provider: google-vertex
+    keywords:
+      enabled: true
+      model: openai/gpt-5.4
+      max_keywords: 15
+
+  filter:
+    paper_relevance:
+      enabled: true
+      model: openai/gpt-oss-20b
+      provider: google-vertex
+      concurrency: 20
+
+  answer:
+    model: openai/gpt-5.4
+    # provider 不指定 → OpenRouter 自动选最优
+    max_tokens: 4096
+    prompt_template: generate_answer_v4
+    system_prompt: medical_expert
+
+llm:
+  default_provider: openrouter
+  providers:
+    openrouter:
+      api_key: "${OPENROUTER_API_KEY:}"
+      base_url: "https://openrouter.ai/api/v1"
+  retry:
+    max_retries: 3
+    backoff:
+      - 2
+      - 4
+      - 6

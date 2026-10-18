@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open OE — Evidence-Based Medical AI</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f1f38;
+  --card:rgba(15,31,56,.7);--card-hover:rgba(20,40,72,.8);
+  --glass:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+  --accent:#00d4aa;--accent-dim:rgba(0,212,170,.15);--accent-glow:rgba(0,212,170,.3);
+  --text:#f0f4f8;--text2:#8899aa;--muted:#556677;
+  --danger:#ff6b6b;--warn:#ffc078;
+  --r:12px;--rs:8px;
+  --ease:.25s cubic-bezier(.4,0,.2,1);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC","PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
+  --mono:"SF Mono","Fira Code","Cascadia Code",Consolas,monospace;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Header */
+.header{text-align:center;padding:48px 20px 12px}
+.header h1{font-size:2.4rem;font-weight:700;letter-spacing:-.02em}
+.header h1 span{color:var(--accent)}
+.header p{color:var(--text2);font-size:1rem;margin-top:4px}
+
+/* Search */
+.search-wrap{max-width:720px;margin:24px auto 16px;padding:0 20px}
+.search-box{display:flex;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:6px 6px 6px 18px;transition:border var(--ease)}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:1.05rem;font-family:var(--font)}
+.search-box input::placeholder{color:var(--muted)}
+.search-box button{background:var(--accent);color:#0a1628;border:none;border-radius:var(--rs);padding:10px 22px;font-weight:600;font-size:.95rem;cursor:pointer;transition:opacity var(--ease);white-space:nowrap}
+.search-box button:hover{opacity:.85}
+.search-box button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Example chips */
+.examples{max-width:720px;margin:0 auto 32px;padding:0 20px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{background:var(--glass);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:.85rem;color:var(--text2);cursor:pointer;transition:all var(--ease)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Container */
+.container{max-width:1200px;margin:0 auto;padding:0 20px 60px}
+
+/* Progress */
+.progress-section{display:none;margin-bottom:28px}
+.progress-section.active{display:block}
+.progress-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px 24px;backdrop-filter:blur(12px)}
+.progress-title{font-size:.85rem;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+.progress-bar-track{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-bottom:18px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),#00e6b8);border-radius:2px;transition:width .4s ease;width:0%}
+.stage-list{display:flex;flex-direction:column;gap:8px}
+.stage-item{display:flex;align-items:center;gap:10px;font-size:.9rem;color:var(--muted);transition:color var(--ease)}
+.stage-item.completed{color:var(--accent)}
+.stage-item.active{color:var(--text)}
+.stage-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+.stage-item.active .stage-icon{animation:pulse 1.2s ease infinite}
+.stage-detail{font-size:.78rem;color:var(--text2);margin-left:4px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Results (Q&A history) */
+.qa-entry{margin-bottom:36px}
+.qa-question{font-size:1rem;color:var(--accent);margin-bottom:14px;padding:10px 16px;background:var(--accent-dim);border-radius:var(--rs);display:flex;align-items:center;gap:8px}
+.qa-question::before{content:"Q";font-weight:700;font-size:.75rem;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 6px;flex-shrink:0}
+
+/* Desktop split layout */
+.qa-content{display:block}
+@media(min-width:900px){
+  .qa-content{
+    position:relative;
+    padding-right:400px; /* reserve space for refs panel */
+  }
+  .qa-content > .answer-card{
+    /* Left: natural flow, determines the height */
+  }
+  .refs-panel{
+    position:absolute;
+    top:0;
+    right:0;
+    width:380px;
+    bottom:0; /* height = parent height = answer-card height */
+    overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:var(--accent-dim) transparent;
+  }
+  .refs-panel::-webkit-scrollbar{width:5px}
+  .refs-panel::-webkit-scrollbar-track{background:transparent}
+  .refs-panel::-webkit-scrollbar-thumb{background:var(--accent-dim);border-radius:3px}
+}
+
+/* Answer card */
+.answer-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:24px 28px;backdrop-filter:blur(12px)}
+.answer-card h1,.answer-card h2,.answer-card h3{color:var(--text);margin:18px 0 8px;font-weight:600}
+.answer-card h1{font-size:1.3rem}.answer-card h2{font-size:1.15rem}.answer-card h3{font-size:1.05rem}
+.answer-card p{margin:8px 0;color:var(--text);line-height:1.75}
+.answer-card ul,.answer-card ol{margin:8px 0 8px 20px;color:var(--text)}
+.answer-card li{margin:4px 0}
+.answer-card code{font-family:var(--mono);background:rgba(0,212,170,.1);padding:2px 6px;border-radius:4px;font-size:.88em}
+.answer-card blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:12px 0;color:var(--text2);background:var(--glass);border-radius:0 var(--rs) var(--rs) 0}
+.answer-card strong{color:var(--accent)}
+.answer-card table{width:100%;border-collapse:collapse;margin:12px 0}
+.answer-card th,.answer-card td{border:1px solid var(--border);padding:8px 12px;text-align:left;font-size:.9rem}
+.answer-card th{background:var(--glass);color:var(--accent);font-weight:600}
+
+/* Citation superscript */
+sup.cite{display:inline-flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);font-size:.7rem;font-weight:700;min-width:18px;height:18px;padding:0 4px;border-radius:9px;cursor:pointer;position:relative;vertical-align:super;margin:0 1px;transition:background var(--ease)}
+sup.cite:hover{background:var(--accent-glow)}
+.cite-tooltip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a2a44;border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:.78rem;color:var(--text);white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;opacity:0;transition:opacity .2s;z-index:100;font-weight:400;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+sup.cite:hover .cite-tooltip{opacity:1}
+
+/* References panel */
+.refs-panel{margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;backdrop-filter:blur(12px)}
+@media(min-width:900px){.refs-panel{margin-top:0}}
+.refs-title{font-size:1rem;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.refs-title::before{content:"🔗"}
+.ref-card{background:var(--glass);border:1px solid var(--border);border-radius:var(--rs);padding:14px 18px;margin-bottom:8px;transition:all .3s}
+.ref-card:hover{border-color:var(--accent)}
+.ref-card.highlight{border-color:var(--accent);background:var(--accent-dim);transition:all .3s}
+.ref-num{display:inline-flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);font-size:.72rem;font-weight:700;width:22px;height:22px;border-radius:11px;margin-right:10px;flex-shrink:0;vertical-align:middle}
+.ref-title{font-size:.92rem;color:var(--text);font-weight:500}
+.ref-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;align-items:center}
+.ref-badge{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:4px;font-weight:600}
+.ref-badge.paper{background:rgba(0,212,170,.12);color:var(--accent)}
+.ref-badge.guideline{background:rgba(255,192,120,.15);color:var(--warn)}
+.ref-doi{font-size:.78rem;color:var(--text2)}
+.ref-year{font-size:.78rem;color:var(--muted)}
+
+/* Stats bar — spans full width below the split */
+.qa-stats{margin-top:16px}
+.stats-bar{background:var(--glass);border:1px solid var(--border);border-radius:var(--rs);padding:10px 18px;font-size:.8rem;color:var(--text2);display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.stats-bar .sep{color:var(--muted)}
+.stats-bar .accent{color:var(--accent);font-weight:600}
+
+/* Mobile reference modal */
+.ref-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);opacity:0;transition:opacity .2s;pointer-events:none}
+.ref-modal-overlay.active{opacity:1;pointer-events:auto}
+.ref-modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:90vw;max-height:80vh;overflow-y:auto;position:relative;min-width:280px}
+.ref-modal-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text2);font-size:1.4rem;cursor:pointer;line-height:1;padding:4px 8px;border-radius:var(--rs);transition:color var(--ease),background var(--ease)}
+.ref-modal-close:hover{color:var(--text);background:var(--glass)}
+.ref-modal .ref-modal-num{display:inline-flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);font-size:.8rem;font-weight:700;width:26px;height:26px;border-radius:13px;margin-right:10px;flex-shrink:0}
+.ref-modal .ref-modal-title{font-size:1.05rem;color:var(--text);font-weight:600;margin-bottom:12px;padding-right:28px;line-height:1.5}
+.ref-modal .ref-modal-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* Footer */
+.footer{text-align:center;padding:40px 20px 28px;font-size:.8rem;color:var(--muted);border-top:1px solid var(--border);margin-top:40px}
+
+/* Error */
+.error-msg{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);border-radius:var(--rs);padding:14px 18px;color:var(--danger);font-size:.9rem;margin-bottom:16px}
+
+/* Responsive */
+@media(max-width:600px){
+  .header{padding:32px 16px 8px}
+  .header h1{font-size:1.6rem}
+  .search-box{flex-direction:column}
+  .search-box button{width:100%}
+  .answer-card{padding:16px 18px}
+  .stats-bar{flex-direction:column;gap:4px}
+  .cite-tooltip{max-width:200px;white-space:normal}
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <h1><span>Open</span> OE Lite</h1>
+  <p>Evidence-Based Medical AI</p>
+</header>
+
+<!-- Search -->
+<div class="search-wrap">
+  <form class="search-box" id="searchForm" autocomplete="off">
+    <input type="text" id="queryInput" placeholder="输入医学问题…" autofocus>
+    <button type="submit" id="submitBtn">搜索</button>
+  </form>
+</div>
+
+<!-- Example chips -->
+<div class="examples" id="examples">
+  <span class="chip" data-q="JAK抑制剂使用有哪些注意事项？">JAK抑制剂注意事项</span>
+  <span class="chip" data-q="GLP-1药物有哪些安全风险？">GLP-1药物有哪些安全风险</span>
+  <span class="chip" data-q="糖尿病患者的血糖控制目标应该如何设定？">血糖控制目标</span>
+  <span class="chip" data-q="已经使用过抗血管生成药物的卵巢肿瘤患者复发之后能否再次使用抗血管生成药物？">卵巢癌治疗</span>
+</div>
+
+<!-- Main container -->
+<div class="container">
+  <!-- Progress -->
+  <div class="progress-section" id="progressSection">
+    <div class="progress-card">
+      <div class="progress-title">处理中…</div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar"></div></div>
+      <div class="stage-list" id="stageList"></div>
+    </div>
+  </div>
+
+  <!-- Results history -->
+  <div id="resultsHistory"></div>
+</div>
+
+<!-- Mobile reference modal -->
+<div class="ref-modal-overlay" id="refModalOverlay">
+  <div class="ref-modal" id="refModal">
+    <button class="ref-modal-close" id="refModalClose" aria-label="关闭">&times;</button>
+    <div id="refModalBody"></div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">Open OE · 仅供研究参考 · 不构成医疗建议</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  const STAGES = [
+    {key:"safety",   label:"安全检查"},
+    {key:"enhance",  label:"问题增强"},
+    {key:"retrieval",label:"文献检索"},
+    {key:"merge",    label:"去重合并"},
+    {key:"filter",   label:"相关性过滤"},
+    {key:"answer",   label:"生成回答"},
+    {key:"done",     label:"完成"}
+  ];
+
+  const stageIndex = Object.fromEntries(STAGES.map((s,i)=>[s.key,i]));
+
+  /* ── DOM refs ─────────────────────────────────── */
+  const form          = document.getElementById("searchForm");
+  const input         = document.getElementById("queryInput");
+  const submitBtn     = document.getElementById("submitBtn");
+  const progressSec   = document.getElementById("progressSection");
+  const progressBar   = document.getElementById("progressBar");
+  const stageList     = document.getElementById("stageList");
+  const history       = document.getElementById("resultsHistory");
+  const examples      = document.getElementById("examples");
+  const modalOverlay  = document.getElementById("refModalOverlay");
+  const modalBody     = document.getElementById("refModalBody");
+  const modalClose    = document.getElementById("refModalClose");
+
+  /* ── Mobile detection helper ─────────────────── */
+  function isMobile() { return window.innerWidth < 900; }
+
+  /* ── Chips ────────────────────────────────────── */
+  examples.addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    input.value = chip.dataset.q;
+    input.focus();
+  });
+
+  /* ── Submit ───────────────────────────────────── */
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    runQuery(q);
+  });
+
+  /* ── Mobile modal logic ──────────────────────── */
+  function openRefModal(citation, num) {
+    const doiHref = buildDoiHref(citation.doi);
+    const doiDisplay = buildDoiDisplay(citation.doi);
+    const typeClass = (citation.doc_type === "guideline") ? "guideline" : "paper";
+    const typeLabel = (citation.doc_type === "guideline") ? "guideline" : "paper";
+    const titleText = citation.title || "Untitled";
+
+    let html = `<div class="ref-modal-title"><span class="ref-modal-num">${num}</span>`;
+    html += doiHref
+      ? `<a href="${doiHref}" target="_blank" rel="noopener">${titleText}</a>`
+      : titleText;
+    html += `</div>`;
+    html += `<div class="ref-modal-meta">`;
+    html += `<span class="ref-badge ${typeClass}">${typeLabel}</span>`;
+    if (citation.publication_year) html += `<span class="ref-year">${citation.publication_year}</span>`;
+    if (doiHref) html += `<a class="ref-doi" href="${doiHref}" target="_blank" rel="noopener">${doiDisplay}</a>`;
+    html += `</div>`;
+
+    modalBody.innerHTML = html;
+    modalOverlay.classList.add("active");
+  }
+
+  function closeRefModal() {
+    modalOverlay.classList.remove("active");
+  }
+
+  modalClose.addEventListener("click", closeRefModal);
+  modalOverlay.addEventListener("click", e => {
+    if (e.target === modalOverlay) closeRefModal();
+  });
+
+  /* ── DOI helpers ─────────────────────────────── */
+  function buildDoiHref(doi) {
+    if (!doi) return "";
+    if (doi.startsWith("https://doi.org/")) return doi;
+    return "https://doi.org/" + doi;
+  }
+
+  function buildDoiDisplay(doi) {
+    if (!doi) return "";
+    const prefix = "https://doi.org/";
+    const id = doi.startsWith(prefix) ? doi.slice(prefix.length) : doi;
+    return "DOI: " + id;
+  }
+
+  /* ── Stage detail formatter ───────────────────── */
+  function stageDetail(stage, data) {
+    if (!data) return "";
+    switch(stage) {
+      case "safety":    return data.flag ? data.flag : "";
+      case "enhance":   return data.search_query ? `"${data.search_query}"` : "";
+      case "retrieval": return (data.papers != null) ? `论文 ${data.papers}，指南 ${data.guidelines||0}` : "";
+      case "merge":     return (data.papers != null) ? `论文 ${data.papers}，指南 ${data.guidelines||0}` : "";
+      case "filter":    return (data.papers_kept != null) ? `保留 ${data.papers_kept} / ${data.total||"?"}` : "";
+      case "done":      return (data.citations != null) ? `引用 ${data.citations}` : "";
+      default: return "";
+    }
+  }
+
+  /* ── Build stage list HTML ────────────────────── */
+  function buildStageList() {
+    stageList.innerHTML = STAGES.map(s =>
+      `<div class="stage-item" id="stage-${s.key}">` +
+        `<span class="stage-icon">○</span>` +
+        `<span class="stage-label">${s.label}</span>` +
+        `<span class="stage-detail" id="detail-${s.key}"></span>` +
+      `</div>`
+    ).join("");
+  }
+
+  function updateStage(stageKey, message, data) {
+    const idx = stageIndex[stageKey];
+    if (idx == null) return;
+    STAGES.forEach((s,i) => {
+      const el = document.getElementById("stage-" + s.key);
+      if (!el) return;
+      if (i < idx) {
+        el.className = "stage-item completed";
+        el.querySelector(".stage-icon").textContent = "✓";
+      } else if (i === idx) {
+        el.className = "stage-item active";
+        el.querySelector(".stage-icon").textContent = "●";
+      } else {
+        el.className = "stage-item";
+        el.querySelector(".stage-icon").textContent = "○";
+      }
+    });
+    const detail = document.getElementById("detail-" + stageKey);
+    const extra = stageDetail(stageKey, data);
+    if (detail) detail.textContent = extra ? `— ${extra}` : "";
+    const pct = Math.min(100, Math.round(((idx + 1) / STAGES.length) * 100));
+    progressBar.style.width = pct + "%";
+  }
+
+  /* ── Entry ID counter (for unique ref IDs) ───── */
+  let _entryId = 0;
+
+  /* ── Citation click handler ──────────────────── */
+  /* Stored per-entry so the modal can access citation data */
+  const _citationStore = {};
+
+  function handleCiteClick(eid, refNum) {
+    const citations = _citationStore[eid];
+    if (!citations) return;
+    const idx = parseInt(refNum, 10) - 1;
+    if (idx < 0 || idx >= citations.length) return;
+
+    if (isMobile()) {
+      openRefModal(citations[idx], refNum);
+    } else {
+      const refEl = document.getElementById("ref-" + eid + "-" + refNum);
+      if (!refEl) return;
+      const panel = refEl.closest(".refs-panel");
+      if (panel) {
+        // Scroll the panel so refEl is visible near the top
+        const panelRect = panel.getBoundingClientRect();
+        const refRect = refEl.getBoundingClientRect();
+        const scrollOffset = refRect.top - panelRect.top + panel.scrollTop - 12;
+        panel.scrollTo({ top: scrollOffset, behavior: "smooth" });
+      }
+      refEl.classList.add("highlight");
+      setTimeout(() => refEl.classList.remove("highlight"), 2000);
+    }
+  }
+
+  /* Expose to inline onclick */
+  window.__handleCite = handleCiteClick;
+
+  /* ── Render results ───────────────────────────── */
+  function renderResult(question, data) {
+    const entry = document.createElement("div");
+    entry.className = "qa-entry";
+
+    const citations = data.citations || [];
+    const eid = _entryId;
+    _citationStore[eid] = citations;
+
+    // Question
+    const qDiv = document.createElement("div");
+    qDiv.className = "qa-question";
+    qDiv.textContent = question;
+    entry.appendChild(qDiv);
+
+    // Content wrapper (grid on desktop, stacked on mobile)
+    const content = document.createElement("div");
+    content.className = "qa-content";
+
+    // Answer card
+    const card = document.createElement("div");
+    card.className = "answer-card";
+    const rawAnswer = data.answer || "";
+    let html = marked.parse(rawAnswer);
+    html = html.replace(/\[\^(\d+)\]/g, (_, n) => {
+      const ci = parseInt(n, 10) - 1;
+      const title = (citations[ci] && citations[ci].title) ? citations[ci].title.replace(/"/g, '&quot;') : `参考 ${n}`;
+      return `<sup class="cite" data-ref="${n}" onclick="window.__handleCite(${eid},${n})">` +
+             `${n}<span class="cite-tooltip">${title}</span></sup>`;
+    });
+    card.innerHTML = html;
+    content.appendChild(card);
+
+    // References panel
+    if (citations.length > 0) {
+      const refsPanel = document.createElement("div");
+      refsPanel.className = "refs-panel";
+      refsPanel.innerHTML = `<div class="refs-title">参考文献</div>`;
+      citations.forEach((c, i) => {
+        const num = i + 1;
+        const refId = `ref-${eid}-${num}`;
+        const typeClass = (c.doc_type === "guideline") ? "guideline" : "paper";
+        const typeLabel = (c.doc_type === "guideline") ? "guideline" : "paper";
+        const doiHref = buildDoiHref(c.doi);
+        const doiDisplay = buildDoiDisplay(c.doi);
+        const doiLink = doiHref ? `<a class="ref-doi" href="${doiHref}" target="_blank" rel="noopener">${doiDisplay}</a>` : "";
+        const titleText = c.title || "Untitled";
+        const titleHtml = doiHref
+          ? `<a href="${doiHref}" target="_blank" rel="noopener" class="ref-title">${titleText}</a>`
+          : `<span class="ref-title">${titleText}</span>`;
+        refsPanel.innerHTML +=
+          `<div class="ref-card" id="${refId}">` +
+            `<span class="ref-num">${num}</span>` +
+            titleHtml +
+            `<div class="ref-meta">` +
+              `<span class="ref-badge ${typeClass}">${typeLabel}</span>` +
+              (c.publication_year ? `<span class="ref-year">${c.publication_year}</span>` : "") +
+              doiLink +
+            `</div>` +
+          `</div>`;
+      });
+      content.appendChild(refsPanel);
+    }
+
+    entry.appendChild(content);
+
+    // Stats bar (full width, below the split)
+    const stats = data.stats || {};
+    const timings = data.timings || {};
+    const totalSec = timings.total_ms != null ? (timings.total_ms / 1000).toFixed(1) : "?";
+    const statsWrap = document.createElement("div");
+    statsWrap.className = "qa-stats";
+    const statsDiv = document.createElement("div");
+    statsDiv.className = "stats-bar";
+    statsDiv.innerHTML =
+      `<span>检索 <span class="accent">${stats.papers_retrieved ?? "?"}</span></span>` +
+      `<span class="sep">→</span>` +
+      `<span>去重 <span class="accent">${stats.papers_after_merge ?? "?"}</span></span>` +
+      `<span class="sep">→</span>` +
+      `<span>过滤 <span class="accent">${stats.papers_after_filter ?? "?"}</span></span>` +
+      `<span class="sep">→</span>` +
+      `<span>引用 <span class="accent">${citations.length}</span></span>` +
+      `<span class="sep">|</span>` +
+      `<span>耗时 <span class="accent">${totalSec}s</span></span>`;
+    statsWrap.appendChild(statsDiv);
+    entry.appendChild(statsWrap);
+
+    // Prepend to history (newest first)
+    history.insertBefore(entry, history.firstChild);
+  }
+
+  /* ── Main query function ──────────────────────── */
+  function runQuery(question) {
+    _entryId++;
+    submitBtn.disabled = true;
+    progressSec.classList.add("active");
+    buildStageList();
+    progressBar.style.width = "0%";
+
+    const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${wsProto}//${location.host}/ws/query`;
+
+    let ws;
+    try { ws = new WebSocket(wsUrl); } catch(_) { ws = null; }
+
+    if (!ws) {
+      fallbackPost(question);
+      return;
+    }
+
+    let gotResult = false;
+    let didFallback = false;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({question}));
+    };
+
+    ws.onmessage = evt => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch(_) { return; }
+
+      if (msg.type === "progress") {
+        updateStage(msg.stage, msg.message, msg.data);
+      } else if (msg.type === "result") {
+        gotResult = true;
+        finishQuery(question, msg.data);
+      }
+    };
+
+    ws.onerror = () => {
+      if (!gotResult && !didFallback) { didFallback = true; fallbackPost(question); }
+    };
+
+    ws.onclose = () => {
+      submitBtn.disabled = false;
+    };
+  }
+
+  /* ── Finish ───────────────────────────────────── */
+  function finishQuery(question, data) {
+    progressSec.classList.remove("active");
+    submitBtn.disabled = false;
+    renderResult(question, data);
+    input.value = "";
+    input.focus();
+  }
+
+  /* ── Fallback POST ────────────────────────────── */
+  function fallbackPost(question) {
+    const simStages = ["safety","enhance","retrieval","merge","filter","answer"];
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < simStages.length) { updateStage(simStages[i], "", {}); i++; }
+    }, 600);
+
+    fetch("/api/query", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question})
+    })
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      clearInterval(timer);
+      updateStage("done", "", {});
+      finishQuery(question, data);
+    })
+    .catch(err => {
+      clearInterval(timer);
+      progressSec.classList.remove("active");
+      submitBtn.disabled = false;
+      const errDiv = document.createElement("div");
+      errDiv.className = "error-msg";
+      errDiv.textContent = "查询失败: " + err.message;
+      history.insertBefore(errDiv, history.firstChild);
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
