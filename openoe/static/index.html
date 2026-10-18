@@ -547,8 +547,9 @@ function renderAll(){renderChats();placeComposer();renderThread();updateComposer
 function renderThread(){const c=chat();$("thread").innerHTML=c?c.msgs.map(msgHtml).join(""):"";}
 function rerender(m){const el=$("m-"+m.id);if(el)el.outerHTML=msgHtml(m);else renderThread();}
 function scrollEnd(){const s=$("scroll");s.scrollTop=s.scrollHeight;}
+function seedTitle(s){const c=chat();if(!c)return s;for(const x of c.msgs){if(x.kind!=="discover"||!x.data)continue;const p=(x.data.results||[]).find(r=>r.openalex_id===s)||(x.data.seeds||[]).find(r=>r.openalex_id===s);if(p&&p.title)return p.title;}return s;}
 function msgHtml(m){
-  if(m.role==="user")return `<div class="umsg" id="m-${m.id}"><div style="max-width:78%;display:flex;flex-direction:column;align-items:flex-end"><div class="ububble" style="max-width:100%">${esc(m.text||"Find more papers like my seeds")}</div>${(m.seeds||[]).length?`<div class="useeds">${m.seeds.map(s=>`<span class="chip mono" title="${esc(s)}">${ic("paper","sm")}${esc(s.length>48?s.slice(0,46)+"…":s)}</span>`).join("")}</div>`:""}</div></div>`;
+  if(m.role==="user")return `<div class="umsg" id="m-${m.id}"><div style="max-width:78%;display:flex;flex-direction:column;align-items:flex-end"><div class="ububble" style="max-width:100%">${esc(m.text||"Find more papers like my seeds")}</div>${(m.seeds||[]).length?`<div class="useeds">${m.seeds.map(s=>{const t=seedTitle(s);return `<span class="chip mono" title="${esc(t)}">${ic("paper","sm")}${esc(t.length>48?t.slice(0,46)+"…":t)}</span>`;}).join("")}</div>`:""}</div></div>`;
   const label=m.kind==="discover"?"Discover":m.kind==="ask"?"Ask":"Follow-up";
   return `<div class="amsg" id="m-${m.id}"><div class="logo" style="background:#fff;border:1px solid var(--border,#e5e5e5)"><img src="/static/brand/medicup-mark.png" alt="" style="width:62%"></div><div class="abody"><div class="aname">MedicUp <small>${label}</small></div>${m.kind==="discover"?discHtml(m):m.kind==="ask"?askHtml(m):fuHtml(m)}</div></div>`;
 }
