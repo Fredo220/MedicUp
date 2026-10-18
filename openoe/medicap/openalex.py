@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import Any, Dict, Iterable, List, Optional
+import time
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
@@ -67,16 +68,27 @@ def to_paper(w: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+_RESP_CACHE: Dict[str, Tuple[float, Any]] = {}
+_RESP_TTL = 6 * 3600
+
+
 class OpenAlex:
     def __init__(self, client: httpx.AsyncClient, base: str = "https://api.openalex.org",
-                 email: Optional[str] = None, concurrency: int = 6) -> None:
-        self.c, self.base, self.email = client, base.rstrip("/"), email
+                 email: Optional[str] = None, concurrency: int = 6, api_key: Optional[str] = None) -> None:
+        self.c, self.base, self.email, self.api_key = client, base.rstrip("/"), email, api_key
         self.sem = asyncio.Semaphore(concurrency)
+        self.limited = False      # set when OpenAlex answers 429 with a long Retry-After
 
     async def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         p = dict(params or {})
         if self.email:
             p["mailto"] = self.email
+        ck = path + "?" + "&".join(f"{k}={v}" for k, v in sorted(p.items()))
+        hit = _RESP_CACHE.get(ck)
+        if hit and time.time() - hit[0] < _RESP_TTL:
+            return hit[1]
+        if self.api_key:
+            p["api_key"] = self.api_key
         async with self.sem:
             for attempt in range(3):
                 try:
@@ -84,10 +96,19 @@ class OpenAlex:
                     if r.status_code == 404:
                         return None
                     if r.status_code == 429:
-                        await asyncio.sleep(1 + attempt)
+                        wait = float(r.headers.get("retry-after") or 1)
+                        if wait > 10 or attempt == 2:
+                            self.limited = True
+                            log.warning("OpenAlex rate limit hit on %s (retry-after %ss)", path, wait)
+                            return None
+                        await asyncio.sleep(wait)
                         continue
                     r.raise_for_status()
-                    return r.json()
+                    data = r.json()
+                    if len(_RESP_CACHE) > 5000:
+                        _RESP_CACHE.clear()
+                    _RESP_CACHE[ck] = (time.time(), data)
+                    return data
                 except httpx.HTTPError as e:
                     if attempt == 2:
                         log.warning("OpenAlex %s failed: %s", path, e)

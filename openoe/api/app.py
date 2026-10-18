@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from openoe.core.config import load_config, validate_config, apply_overrides
@@ -122,7 +122,10 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     @app.post("/api/medicap/discover", tags=["medicap"])
     async def medicap_discover(body: MedicapDiscoverRequest):
-        return await medicap.discover(body.question, body.seeds[:30], app.state.config, llm=llm, limit=body.limit)
+        try:
+            return await medicap.discover(body.question, body.seeds[:30], app.state.config, llm=llm, limit=body.limit)
+        except medicap.OpenAlexLimited as e:
+            return JSONResponse(status_code=503, content={"detail": str(e)})
 
     @app.post("/api/medicap/figures", tags=["medicap"])
     async def medicap_figures(body: MedicapFiguresRequest):

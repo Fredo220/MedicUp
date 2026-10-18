@@ -79,12 +79,26 @@ async def resolve_line(oa: OpenAlex, raw: str) -> Dict[str, Any]:
 async def resolve(lines: List[str], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
     async with httpx.AsyncClient(timeout=30.0) as c:
         oa = _client(c, cfg)
-        return list(await asyncio.gather(*[resolve_line(oa, ln) for ln in lines]))
+        res = list(await asyncio.gather(*[resolve_line(oa, ln) for ln in lines]))
+        if oa.limited:
+            for r in res:
+                if r["st"] == "miss":
+                    r["msg"] = LIMIT_MSG
+        return res
 
 
 def _client(c: httpx.AsyncClient, cfg: Dict[str, Any]) -> OpenAlex:
     route = (cfg.get("retrieval", {}).get("routes", {}).get("openalex_kw", {}) or {}).get("config", {})
-    return OpenAlex(c, route.get("base_url", "https://api.openalex.org"), route.get("email") or None)
+    return OpenAlex(c, route.get("base_url", "https://api.openalex.org"), route.get("email") or None,
+                    api_key=route.get("api_key") or None)
+
+
+class OpenAlexLimited(RuntimeError):
+    """OpenAlex refused requests because the daily rate limit/credits are used up."""
+
+
+LIMIT_MSG = ("OpenAlex rate limit reached for this server (daily credits used up). "
+             "Set OPENALEX_API_KEY / OPENALEX_EMAIL in .env or retry later.")
 
 
 # ── Scoring helpers ──────────────────────────────────────────────────────────
@@ -218,6 +232,8 @@ async def discover(question: str, seed_ids: List[str], cfg: Dict[str, Any], llm=
         )
         by_id = {short_id(w["id"]): w for w in seed_works}
         seeds = [s for s in seed_ids if s in by_id]
+        if oa.limited and not seeds:
+            raise OpenAlexLimited(LIMIT_MSG)
 
         # Citation graph: what each seed cites, and what cites each seed.
         links: Dict[str, Dict[str, Set[int]]] = {}
