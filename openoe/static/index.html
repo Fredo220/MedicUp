@@ -615,7 +615,7 @@ function paperHtml(m,p){
   return `<div class="paper${dec==="acc"?" acc":dec==="rej"?" rej":""}" id="p-${m.id}-${esc(id)}">
    <div class="prow"><div class="rank">${p._rank}</div><div class="pmain">
      <a class="ptitle" href="${esc(L.doi||L.openalex||"#")}" target="_blank" rel="noopener">${esc(p.title)}</a>
-     <div class="pmeta">${esc(authors)}${p.venue?` · <i>${esc(p.venue)}</i>`:""}${p.year?` · ${p.year}`:""} · cited ${(p.cited_by_count||0).toLocaleString()}×</div>
+     <div class="pmeta">${esc(authors)}${p.venue?` · <i>${esc(p.venue)}</i>`:""}${p.year?` · ${p.year}`:""}${String(id).startsWith("pmid:")?"":` · cited ${(p.cited_by_count||0).toLocaleString()}×`}</div>
      ${tags?`<div class="tags">${tags}</div>`:""}</div>
      <div class="score" title="Match score (1–100%)"><b>${p._pct}%</b><small>match</small><div class="bar"><i style="width:${p._pct}%"></i></div></div></div>
    ${p.is_retracted?`<div class="retracted">${ic("warn","sm")}This paper has been retracted. Do not use it as evidence.</div>`:""}
