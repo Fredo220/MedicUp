@@ -50,14 +50,11 @@ stages:
     system_prompt: medical_expert
 
 llm:
-  default_provider: "${LLM_PROVIDER:nebius}"
+  default_provider: nebius
   providers:
     nebius:
       api_key: "${NEBIUS_API_KEY:}"
       base_url: "${NEBIUS_BASE_URL:https://api.tokenfactory.nebius.com/v1}"
-    openrouter:
-      api_key: "${OPENROUTER_API_KEY:}"
-      base_url: "https://openrouter.ai/api/v1"
   retry:
     max_retries: 3
     backoff:
