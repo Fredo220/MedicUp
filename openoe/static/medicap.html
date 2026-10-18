@@ -207,7 +207,7 @@ pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);bord
 .exgrid pre{margin:0;padding:12px;font:11.5px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:460px;overflow:auto}
 .empty{padding:14px 12px;color:var(--muted)}
 
-#subq .badge,#concepts .badge{white-space:normal;max-width:100%;overflow-wrap:anywhere;text-align:left}
+#subq .badge,#concepts .badge{display:inline-block;height:auto;line-height:1.35;padding-top:2px;padding-bottom:2px;margin:0 4px 4px 0;white-space:normal;max-width:100%;overflow-wrap:anywhere;text-align:left}
 .sup{margin:4px 0 0;padding-left:18px;font-size:12px}.sup li{margin:2px 0}.sup a{color:var(--accent)}
 footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);color:var(--faint);font:11px var(--mono)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -609,8 +609,8 @@ function renderExport(){
   $("#expList").innerHTML=acc.length?`<ol>${acc.map(p=>`<li>${p.flag?`<span class="badge err">${esc(p.flag)}</span> `:""}${esc(p.t)} <span class="faint">(${p.y??"n.d."})</span></li>`).join("")}</ol>`:'<div class="empty">Accept rows in the Ranked tab to build the list.</div>';
   let out="";
   if(st.fmt==="md")out=`# Reading list: ${$("#qInput").value.trim()||"Medicap"}\n\n`+acc.map((p,i)=>`${i+1}. ${p.flag?`**[${p.flag.toUpperCase()}]** `:""}${p.au} (${p.y??"n.d."}). *${p.t}*. ${p.v}. ${link(p)}`).join("\n");
-  if(st.fmt==="bib")out=acc.map(p=>`@article{${key(p)},\n  title   = {${p.t}},\n  author  = {${p.au.replace(/, /g," and ")}},\n  journal = {${p.v}},\n  year    = {${p.y}},\n  doi     = {${p.doi}},\n  url     = {${link(p)}}${p.flag?`,\n  note    = {${p.flag.toUpperCase()}}`:""}\n}`).join("\n\n");
-  if(st.fmt==="ris")out=acc.map(p=>`TY  - JOUR\nTI  - ${p.t}\n${p.au.split(", ").map(a=>"AU  - "+a).join("\n")}\nJO  - ${p.v}\nPY  - ${p.y}\nDO  - ${p.doi}\nUR  - ${link(p)}${p.flag?`\nN1  - ${p.flag.toUpperCase()}`:""}\nER  -`).join("\n\n");
+  if(st.fmt==="bib")out=`@comment{Reading list: ${($("#qInput").value.trim()||"Medicap").replace(/[{}]/g,"")}}\n\n`+acc.map(p=>`@article{${key(p)},\n  title   = {${p.t}},\n  author  = {${p.au.replace(/, /g," and ")}},\n  journal = {${p.v}},\n  year    = {${p.y}},\n  doi     = {${p.doi}},\n  url     = {${link(p)}}${p.flag?`,\n  note    = {${p.flag.toUpperCase()}}`:""}\n}`).join("\n\n");
+  if(st.fmt==="ris")out=acc.map(p=>`TY  - JOUR\nTI  - ${p.t}\n${p.au.split(", ").map(a=>"AU  - "+a).join("\n")}\nJO  - ${p.v}\nPY  - ${p.y}\nN1  - Reading list: ${$("#qInput").value.trim()||"Medicap"}\nDO  - ${p.doi}\nUR  - ${link(p)}${p.flag?`\nN1  - ${p.flag.toUpperCase()}`:""}\nER  -`).join("\n\n");
   $("#expOut").textContent=acc.length?out:"// nothing accepted yet";
 }
 $("#fmt").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.fmt=b.dataset.fmt;$$("#fmt button").forEach(x=>x.className=x===b?"on a":"");renderExport()});
