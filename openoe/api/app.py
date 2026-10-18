@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from openoe.core.config import load_config, validate_config, apply_overrides
@@ -18,6 +18,7 @@ from openoe.core.models import QueryRequest, QueryResponse
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
 from openoe.medicap import discover as medicap
+from openoe.medicap import figures as medicap_figures_mod
 from openoe.pipeline.orchestrator import Orchestrator
 from openoe.sources.openalex import OpenAlexSource
 from openoe.sources.tavily import TavilySource
@@ -27,6 +28,10 @@ log = logging.getLogger(__name__)
 
 class MedicapResolveRequest(BaseModel):
     lines: List[str]
+
+
+class MedicapFiguresRequest(BaseModel):
+    papers: List[Dict[str, Any]]
 
 
 class MedicapDiscoverRequest(BaseModel):
@@ -118,6 +123,17 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     @app.post("/api/medicap/discover", tags=["medicap"])
     async def medicap_discover(body: MedicapDiscoverRequest):
         return await medicap.discover(body.question, body.seeds[:30], app.state.config, llm=llm, limit=body.limit)
+
+    @app.post("/api/medicap/figures", tags=["medicap"])
+    async def medicap_figures(body: MedicapFiguresRequest):
+        return {"figures": await medicap_figures_mod.figures(body.papers[:60], app.state.config)}
+
+    @app.get("/api/medicap/img", tags=["medicap"], include_in_schema=False)
+    async def medicap_img(u: str):
+        got = await medicap_figures_mod.fetch_image(u)
+        if not got:
+            return Response(status_code=404)
+        return Response(content=got[0], media_type=got[1], headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/api/medicap/status", tags=["medicap"])
     async def medicap_status():

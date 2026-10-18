@@ -47,6 +47,7 @@ async def tavily_search(
     include_domains: Optional[List[str]] = None,
     exclude_domains: Optional[List[str]] = None,
     include_answer: bool = False,
+    include_images: bool = False,
     timeout: float = 30.0,
 ) -> Dict[str, Any]:
     if not api_key:
@@ -57,6 +58,9 @@ async def tavily_search(
         "search_depth": search_depth,
         "include_answer": include_answer,
     }
+    if include_images:
+        body["include_images"] = True
+        body["include_image_descriptions"] = True
     if include_domains:
         body["include_domains"] = include_domains
     if exclude_domains:

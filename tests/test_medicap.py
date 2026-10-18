@@ -62,3 +62,26 @@ def test_graph_and_loo_rank_hidden_seed():
     rows = M._loo(pool, seeds, links, ["W9"], [], sem, {})
     assert rows[0]["seed"] == 1 and rows[0]["graph"] is not None
     assert rows[0]["keyword"] is None and rows[0]["web"] is None
+
+
+def test_figure_matching_only_accepts_the_papers_own_images():
+    from openoe.medicap.figures import figures, match_keys, pick_image
+    keys = match_keys("10.1038/s41571-023-00832-4", "PMC4800826")
+    imgs = ["https://media.springernature.com/x/art%3A10.1038%2Fs41571-023-00832-4/Fig1.png",
+            "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/b8ce/4800826/f4.jpg"]
+    assert pick_image(["https://other.org/unrelated.png", imgs[0]], keys)["url"] == imgs[0]
+    assert pick_image([imgs[1]], keys)["url"] == imgs[1]
+    assert pick_image(["https://other.org/unrelated.png"], keys) is None
+    assert pick_image(["http://insecure.org/s41571-023-00832-4.png"], keys) is None
+
+    async def fake_search(q, **kw):
+        assert kw["include_images"]
+        return {"images": [{"url": "https://x.org/" + q.replace(" ", "_") + ".png"}]}
+    cfg = {"stages": {"web_context": {"api_key": "k"}}}
+    res = asyncio.run(figures([{"id": "Wfig1", "t": "no doi"}], cfg, search=fake_search))
+    assert res == {"Wfig1": None}   # no identifiers → nothing provable → no image
+
+
+def test_image_proxy_only_serves_selected_urls():
+    from openoe.medicap.figures import fetch_image
+    assert asyncio.run(fetch_image("http://169.254.169.254/latest/meta-data")) is None
