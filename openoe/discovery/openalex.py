@@ -15,7 +15,8 @@ log = logging.getLogger(__name__)
 
 SELECT_FIELDS = (
     "id,doi,title,publication_year,cited_by_count,authorships,primary_location,"
-    "abstract_inverted_index,referenced_works,related_works,ids,type,open_access"
+    "abstract_inverted_index,referenced_works,related_works,ids,type,open_access,"
+    "is_retracted,primary_topic"
 )
 
 

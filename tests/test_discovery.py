@@ -9,11 +9,14 @@ from openoe.discovery.rank import (
     calculate_final_score,
     calculate_pre_score,
     parse_judge_json,
+    score_to_pct,
     verify_quote,
 )
 from openoe.discovery.seeds import parse_seed
 from openoe.discovery.followup import _BARE_CITATION_RE as _FOLLOWUP_BARE_CITATION_RE
-from openoe.discovery.openalex import _describe_error
+from openoe.discovery.models import paper_from_work
+from openoe.discovery.openalex import SELECT_FIELDS, _describe_error
+from openoe.discovery.pubmed import parse_pubmed_abstracts
 from openoe.pipeline.answer import _BARE_NUMERIC_CITATION_RE
 
 
@@ -82,6 +85,65 @@ def test_judge_json_parser_ignores_surrounding_prose():
     )
     assert parsed["relevance"] == 8
     assert parsed["related_seeds"] == ["S1"]
+
+
+def test_pubmed_abstract_parser_joins_labelled_parts_and_inline_tags():
+    xml = """\
+    <PubmedArticleSet>
+      <PubmedArticle>
+        <MedlineCitation>
+          <PMID>12345</PMID>
+          <Article>
+            <Abstract>
+              <AbstractText Label="BACKGROUND">We observed <i>melanoma</i> response.</AbstractText>
+              <AbstractText Label="CONCLUSION">Survival improved.</AbstractText>
+            </Abstract>
+          </Article>
+        </MedlineCitation>
+      </PubmedArticle>
+      <PubmedArticle>
+        <MedlineCitation>
+          <PMID>67890</PMID>
+          <Article><ArticleTitle>No abstract available</ArticleTitle></Article>
+        </MedlineCitation>
+      </PubmedArticle>
+    </PubmedArticleSet>
+    """
+
+    assert parse_pubmed_abstracts(xml) == {
+        "12345": "BACKGROUND: We observed melanoma response. CONCLUSION: Survival improved."
+    }
+
+
+def test_judge_study_design_is_normalized_and_defaults_to_unclear():
+    assert parse_judge_json('{"study_design":"rct"}')["study_design"] == "RCT"
+    assert parse_judge_json('{"study_design":"banana"}')["study_design"] == "unclear"
+    assert parse_judge_json('{"relevance":5}')["study_design"] == "unclear"
+
+
+def test_score_pct_is_rounded_and_clamped():
+    assert score_to_pct(0.0) == 1
+    assert score_to_pct(0.834) == 83
+    assert score_to_pct(1.2) == 100
+
+
+def test_paper_from_work_maps_retraction_and_primary_topic():
+    paper = paper_from_work({
+        "id": "https://openalex.org/W123",
+        "title": "A study",
+        "is_retracted": True,
+        "primary_topic": {
+            "display_name": "Melanoma",
+            "field": {"display_name": "Medicine"},
+        },
+    })
+
+    assert paper is not None
+    assert paper.is_retracted is True
+    assert paper.topic == "Melanoma"
+    assert paper.field == "Medicine"
+    assert "is_retracted" in SELECT_FIELDS
+    assert "primary_topic" in SELECT_FIELDS
 
 
 def test_openalex_error_description_does_not_expose_request_query():

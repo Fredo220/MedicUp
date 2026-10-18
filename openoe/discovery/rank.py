@@ -15,6 +15,36 @@ from openoe.llm.prompts import PromptManager
 
 log = logging.getLogger(__name__)
 _BARE_CITATION_RE = re.compile(r"(?<![\^\w])\[\d+(?:\s*[,\-–]\s*\d+)*\]")
+_STUDY_DESIGNS = (
+    "meta-analysis",
+    "systematic review",
+    "RCT",
+    "non-randomized trial",
+    "cohort",
+    "case-control",
+    "cross-sectional",
+    "case report",
+    "narrative review",
+    "guideline",
+    "animal",
+    "in vitro",
+    "computational",
+    "unclear",
+)
+
+
+def normalize_study_design(value: Any) -> str:
+    if not isinstance(value, str):
+        return "unclear"
+    normalized = value.strip().casefold()
+    return next(
+        (design for design in _STUDY_DESIGNS if design.casefold() == normalized),
+        "unclear",
+    )
+
+
+def score_to_pct(score: float) -> int:
+    return max(1, min(100, round(score * 100)))
 
 
 def parse_judge_json(text: str) -> Dict[str, Any]:
@@ -49,6 +79,7 @@ def parse_judge_json(text: str) -> Dict[str, Any]:
     result = json.loads(text[start:end])
     if not isinstance(result, dict):
         raise ValueError("judge response is not a JSON object")
+    result["study_design"] = normalize_study_design(result.get("study_design"))
     return result
 
 
@@ -210,7 +241,13 @@ async def rank_candidates(
 
     async def judge(entry: Dict[str, Any]) -> Dict[str, Any]:
         paper: Paper = entry["paper"]
-        fallback = {"relevance": 0, "why": "", "quote": "", "related_seeds": []}
+        fallback = {
+            "relevance": 0,
+            "why": "",
+            "quote": "",
+            "related_seeds": [],
+            "study_design": "unclear",
+        }
         prompt = prompts.render(
             "discovery_judge",
             question=question or "No separate research question was provided; assess relevance to the seed papers.",
@@ -246,6 +283,7 @@ async def rank_candidates(
                     "why": why,
                     "quote": quote,
                     "related_seeds": related,
+                    "study_design": parsed["study_design"],
                 }
             except Exception as exc:
                 log.warning("Discovery judge failed for %s: %s", paper.openalex_id, exc)
@@ -261,6 +299,7 @@ async def rank_candidates(
         results.append({
             **paper.to_api_dict(),
             "score": final_score,
+            "score_pct": score_to_pct(final_score),
             "components": {
                 "similarity": entry["similarity"],
                 "seed_links": entry["seed_links"],
@@ -272,6 +311,7 @@ async def rank_candidates(
             "quote": judged["quote"],
             "quote_verified": verify_quote(judged["quote"], paper.abstract),
             "related_seeds": judged["related_seeds"],
+            "study_design": judged["study_design"],
             "signals": entry["signals"],
         })
     results.sort(key=lambda entry: entry["score"], reverse=True)

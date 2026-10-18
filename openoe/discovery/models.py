@@ -21,7 +21,10 @@ class Paper(BaseModel):
     authors: List[str] = Field(default_factory=list)
     cited_by_count: int = 0
     is_oa: bool = False
+    is_retracted: bool = False
     oa_url: Optional[str] = None
+    topic: Optional[str] = None
+    field: Optional[str] = None
     type: Optional[str] = None
     links: Dict[str, Optional[str]] = Field(default_factory=dict)
     referenced_works: List[str] = Field(default_factory=list, exclude=True)
@@ -99,6 +102,8 @@ def paper_from_work(work: Dict[str, Any]) -> Optional[Paper]:
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
     oa = work.get("open_access") or {}
+    primary_topic = work.get("primary_topic") or {}
+    topic_field = primary_topic.get("field") or {}
     doi_url = f"https://doi.org/{quote(doi, safe='/')}" if doi else None
     pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{quote(pmid)}/" if pmid else None
     return Paper(
@@ -112,7 +117,10 @@ def paper_from_work(work: Dict[str, Any]) -> Optional[Paper]:
         authors=authors,
         cited_by_count=int(work.get("cited_by_count") or 0),
         is_oa=bool(oa.get("is_oa")),
+        is_retracted=bool(work.get("is_retracted", False)),
         oa_url=oa.get("oa_url"),
+        topic=primary_topic.get("display_name"),
+        field=topic_field.get("display_name"),
         type=work.get("type"),
         links={
             "openalex": work.get("id"),

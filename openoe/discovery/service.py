@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from openoe.discovery.candidates import gather_candidates
 from openoe.discovery.models import DiscoverRequest, DiscoverResponse
 from openoe.discovery.openalex import OpenAlexClient
+from openoe.discovery.pubmed import PubMedFetchError, fetch_abstracts
 from openoe.discovery.rank import rank_candidates
 from openoe.discovery.seeds import resolve_seeds
 from openoe.llm.client import LLMClient
@@ -56,6 +57,23 @@ async def discover(
     )
     errors.extend(candidate_errors)
     timings["candidates"] = (time.perf_counter() - candidates_started) * 1000
+
+    papers_to_backfill = [*seeds, *(candidate["paper"] for candidate in candidates)]
+    pmids = list(dict.fromkeys(
+        paper.pmid for paper in papers_to_backfill if paper.pmid and not paper.abstract
+    ))
+    if pmids:
+        try:
+            pubmed_abstracts = await fetch_abstracts(pmids)
+        except PubMedFetchError as exc:
+            pubmed_abstracts = exc.abstracts
+            errors.append(str(exc))
+        except Exception as exc:
+            pubmed_abstracts = {}
+            errors.append(f"PubMed abstract fetch failed: {type(exc).__name__}")
+        for paper in papers_to_backfill:
+            if not paper.abstract and paper.pmid and pubmed_abstracts.get(paper.pmid):
+                paper.abstract = pubmed_abstracts[paper.pmid]
 
     results, n_judged, rank_errors, rank_timings = await rank_candidates(
         question=req.question,
