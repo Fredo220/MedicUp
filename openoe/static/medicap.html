@@ -871,7 +871,7 @@ async function sendChat(text){
       const ps=chatPapers();if(!ps.length)throw new Error("Run discovery first: answers are grounded on the ranked papers.");
       const body={question:text,history:hist,papers:ps.map((p,i)=>({n:i+1,openalex_id:p.id,title:p.t,year:p.y,abstract:p.abstract||"",venue:p.v,links:{doi:p.doi?"https://doi.org/"+p.doi:null,openalex:p.url||null}}))};
       const r=await fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      if(!r.ok)throw new Error(r.status===500&&CHAT.llm===false?"No LLM configured on the server (NEBIUS_API_KEY).":"Follow-up failed (HTTP "+r.status+").");
+      if(!r.ok)throw new Error(r.status===503?"No LLM configured on the server: set NEBIUS_API_KEY in .env and restart.":"Follow-up failed (HTTP "+r.status+").");
       const d=await r.json();m.answer=d.answer||"";m.refs=ps.map(p=>({pid:p.id,title:p.t,url:paperLink(p)}));
     }else{
       const r=await fetch("/api/query",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,history:hist})});
