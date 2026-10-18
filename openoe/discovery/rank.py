@@ -55,9 +55,16 @@ def parse_judge_json(text: str) -> Dict[str, Any]:
 _SEED_LABEL_RE = re.compile(r"\b(?:the )?(?:seed (?:paper )?)?S(\d+)\b", flags=re.I)
 
 
+_SEED_WORD_RE = re.compile(r"\b(?:the |these |your )?seed (papers?|collection|set)\b", flags=re.I)
+
+
 def plain_seed_labels(text: str) -> str:
     """Replace internal seed labels (S1, seed paper S2) with clinician-readable wording."""
-    return _SEED_LABEL_RE.sub(lambda m: f"your paper {m.group(1)}", text)
+    text = _SEED_LABEL_RE.sub(lambda m: f"your paper {m.group(1)}", text)
+    return _SEED_WORD_RE.sub(
+        lambda m: f"your {m.group(1).lower()}" if m.group(1).lower().startswith("paper") else "your papers",
+        text,
+    )
 
 
 def _normalize_quote(value: str) -> str:
@@ -137,11 +144,11 @@ async def rank_candidates(
 
     rank_started = time.perf_counter()
     if not candidates:
-        await notify("rank", "Embedding seeds and candidate papers", {
+        await notify("rank", "Sorting by closeness to your papers", {
             "n_seeds": len(seeds), "n_candidates": 0,
         })
         timings["rank"] = (time.perf_counter() - rank_started) * 1000
-        await notify("judge", "Judging the highest-ranked candidates", {"n_judged": 0})
+        await notify("judge", "Reading abstracts and explaining each match", {"n_judged": 0})
         timings["judge"] = 0.0
         return [], 0, [], timings
 
@@ -152,7 +159,7 @@ async def rank_candidates(
         question_index = len(texts)
         texts.append(question)
 
-    await notify("rank", "Embedding seeds and candidate papers", {
+    await notify("rank", "Sorting by closeness to your papers", {
         "n_seeds": len(seeds), "n_candidates": len(candidates),
     })
     errors: List[str] = []
@@ -211,7 +218,7 @@ async def rank_candidates(
     judge_k = int(cfg.get("judge_k", 25))
     to_judge = scored[:max(0, judge_k)]
     timings["rank"] = (time.perf_counter() - rank_started) * 1000
-    await notify("judge", "Judging the highest-ranked candidates", {"n_judged": len(to_judge)})
+    await notify("judge", "Reading abstracts and explaining each match", {"n_judged": len(to_judge)})
     seed_titles = "\n".join(f"S{index + 1}: {paper.title}" for index, paper in enumerate(seeds))
     semaphore = asyncio.Semaphore(10)
     judge_started = time.perf_counter()

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MedicUp — Discover medical research from your seed papers</title>
+<title>MedicUp — Medical literature answers with sources</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -104,7 +104,8 @@ a:hover{text-decoration:underline}
 .answer-card code{font-family:var(--mono);background:rgba(0,212,170,.1);padding:2px 6px;border-radius:4px;font-size:.88em}
 .answer-card blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:12px 0;color:var(--text2);background:var(--glass);border-radius:0 var(--rs) var(--rs) 0}
 .answer-card strong{color:var(--accent)}
-.answer-card table{width:100%;border-collapse:collapse;margin:12px 0}
+.answer-card table,.msg.bot table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:12px 0}
+.answer-card,.msg.bot{min-width:0;overflow-wrap:anywhere}
 .answer-card th,.answer-card td{border:1px solid var(--border);padding:8px 12px;text-align:left;font-size:.9rem}
 .answer-card th{background:var(--glass);color:var(--accent);font-weight:600}
 
@@ -140,7 +141,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
 /* Mobile reference modal */
 .ref-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);opacity:0;transition:opacity .2s;pointer-events:none}
 .ref-modal-overlay.active{opacity:1;pointer-events:auto}
-.ref-modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:90vw;max-height:80vh;overflow-y:auto;position:relative;min-width:280px}
+.ref-modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:min(90vw,640px);box-sizing:border-box;max-height:80vh;overflow-y:auto;position:relative;min-width:280px}
 .ref-modal-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text2);font-size:1.4rem;cursor:pointer;line-height:1;padding:4px 8px;border-radius:var(--rs);transition:color var(--ease),background var(--ease)}
 .ref-modal-close:hover{color:var(--text);background:var(--glass)}
 .ref-modal .ref-modal-num{display:inline-flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);font-size:.8rem;font-weight:700;width:26px;height:26px;border-radius:13px;margin-right:10px;flex-shrink:0}
@@ -674,6 +675,7 @@ details.more[open] summary::before,details.comp[open] summary::before{content:"�
              `${n}<span class="cite-tooltip">${title}</span></sup>`;
     });
     card.innerHTML = html;
+    card.querySelectorAll("a[href]").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
     content.appendChild(card);
 
     // References panel
@@ -836,7 +838,7 @@ document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
 const STAGES=[{key:"seeds",label:"Finding your papers"},{key:"candidates",label:"Following citations, similar studies and the web"},{key:"rank",label:"Sorting by closeness to your papers"},{key:"judge",label:"Reading abstracts and explaining each match"},{key:"done",label:"Done"}];
 const STRONG=new Set(["Meta-analysis","RCT","Guideline","Pooled analysis","Trial sub-analysis"]);
 const yours=a=>(a||[]).map(i=>"your paper "+(i+1)).join(", ");
-const plainSeeds=t=>String(t||"").replace(/\bS(\d+)\b/g,"your paper $1");
+const plainSeeds=t=>String(t||"").replace(/\b(?:the )?(?:seed (?:paper )?)?S(\d+)\b/g,"your paper $1").replace(/\b(?:the |these |your )?seed (papers?|collection|set)\b/gi,(m,w)=>w.toLowerCase().startsWith("paper")?`your ${w.toLowerCase()}`:"your papers");
 const matchLabel=s=>s>=0.75?"Strong match":s>=0.55?"Good match":"Possible match";
 let state={req:null,data:null,liked:new Set(),disliked:new Set(),chat:[]};
 
@@ -913,12 +915,14 @@ function render(){
   if((d.errors||[]).length)$("unresolved").innerHTML+=`<div class="warn-msg">Some sources were temporarily unavailable, so results may be incomplete: ${[...new Set(d.errors.map(e=>String(typeof e==="string"?e:JSON.stringify(e)).split(":")[0]))].map(esc).join(", ")}</div>`;
   const st=d.stats||{}, tm=d.timings||{};
   const totMs=tm.total_ms??tm.done??Object.values(tm).reduce((a,b)=>Math.max(a,+b||0),0); const tot=(totMs/1000).toFixed(1);
-  $("discStats").innerHTML=`<span>Screened <span class="accent">${st.n_candidates??"–"}</span> papers</span><span class="sep">·</span><span>AI read <span class="accent">${st.n_judged??"–"}</span> abstracts</span><span class="sep">·</span><span><span class="accent">${(d.results||[]).length}</span> shown</span><span class="sep">·</span><span>${tot} s</span>`;
+  $("discStats").innerHTML=`<span>Screened <span class="accent">${st.n_candidates??"–"}</span> papers</span><span class="sep">·</span><span>AI read <span class="accent">${st.n_judged??"–"}</span> abstracts</span><span class="sep">·</span><span id="shownCount"></span><span class="sep">·</span><span>${tot} s</span>`;
   $("webList").innerHTML=(d.web_context||[]).length?d.web_context.map(w=>`<div class="web-item"><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join(""):"No web sources used for this search.";
   renderCards(); if($("graphWrap").classList.contains("open"))graph();
 }
 function renderCards(){
   const list=filtered();
+  const total=(state.data.results||[]).length;
+  $("shownCount").innerHTML=`<span class="accent">${list.length}</span>${list.length<total?` of ${total}`:""} shown`;
   $("cards").innerHTML=list.length?list.map(card).join(""):`<div class="hint">No results match the filters.</div>`;
 }
 function card(p){
@@ -989,6 +993,7 @@ $("chatForm").addEventListener("submit",e=>{
     let h=marked.parse((d.answer||"").replace(/~/g,"\\~"));
     h=h.replace(/\[\^(\d+)\]/g,(_,n)=>{const p=papers[+n-1];return `<sup class="cite" data-id="${p?esc(p.openalex_id):""}">${n}<span class="cite-tooltip">${p?esc(p.title):"Ref "+n}</span></sup>`;});
     $("pending").outerHTML=`<div class="msg bot">${h}</div>`;
+    $("chatLog").querySelectorAll("a[href]").forEach(a=>{a.target="_blank";a.rel="noopener";});
     state.chat.push({role:"user",content:q},{role:"assistant",content:(d.answer||"").slice(0,4000)});
   })
   .catch(err=>{$("pending").outerHTML=`<div class="error-msg">Follow-up failed: ${esc(err.message)}</div>`;})

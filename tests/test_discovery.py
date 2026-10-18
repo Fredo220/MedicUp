@@ -159,6 +159,8 @@ def test_study_type_labels_only_what_title_or_abstract_states():
     assert study_type("EMPEROR-Preserved: a promise fulfilled", "", "editorial") == "Editorial"
     assert study_type("Heart failure therapy", "", "review") == "Review"
     assert study_type("Heart failure therapy", "") is None
+    assert study_type("Rationale for and Design of the EMPEROR-Preserved Trial", "randomized") == "Trial design"
+    assert study_type("Dapagliflozin and empagliflozin in HFpEF: pooled data from DELIVER and EMPEROR-Preserved", "randomized") == "Pooled analysis"
 
 
 def test_pick_title_match_prefers_primary_report_and_rejects_nonsense():
@@ -175,6 +177,7 @@ def test_plain_seed_labels_rewrites_internal_labels():
     from openoe.discovery.rank import plain_seed_labels
     assert plain_seed_labels("Same trial as S1 and the seed paper S2.") == "Same trial as your paper 1 and your paper 2."
     assert plain_seed_labels("SGLT2 inhibitors") == "SGLT2 inhibitors"
+    assert plain_seed_labels("Extends the seed papers to HFrEF.") == "Extends your papers to HFrEF."
 
 
 def test_openalex_source_raises_when_database_unavailable(monkeypatch):

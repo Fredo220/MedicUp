@@ -39,12 +39,12 @@ async def discover(
         email=openalex_cfg.get("email", ""),
         api_key=openalex_cfg.get("api_key"),
     )
-    await notify("seeds", "Resolving seed papers", {"n_seeds": min(len(req.seeds), 10)})
+    await notify("seeds", "Finding your papers", {"n_seeds": min(len(req.seeds), 10)})
     seeds, unresolved = await resolve_seeds(req.seeds, client)
     timings["seeds"] = (time.perf_counter() - started) * 1000
 
     candidates_started = time.perf_counter()
-    await notify("candidates", "Gathering candidate papers", {"n_seeds": len(seeds)})
+    await notify("candidates", "Following citations, similar studies and the web", {"n_seeds": len(seeds)})
     candidates, web_context, candidate_errors = await gather_candidates(
         question=req.question,
         seeds=seeds,
@@ -85,7 +85,7 @@ async def discover(
     ).model_dump()
     timings["done"] = (time.perf_counter() - started) * 1000
     response["timings"] = timings
-    await notify("done", "Discovery complete", {
+    await notify("done", "Done", {
         "n_candidates": len(candidates),
         "n_results": len(results),
     })

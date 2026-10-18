@@ -70,9 +70,9 @@ def study_type(title: str, abstract: str = "", work_type: Optional[str] = None) 
         return "Meta-analysis"
     if _has(r"guideline|consensus|position statement|scientific statement|focused update|recommendations", t):
         return "Guideline"
-    if _has(r"rationale and design|design and rationale|study design|protocol", t):
+    if _has(r"rationale (?:for )?and design|design and rationale|study design|baseline characteristics|protocol", t):
         return "Trial design"
-    if _has(r"pooled analysis", t):
+    if _has(r"pooled|patient-level|participant-level|individual patient data", t):
         return "Pooled analysis"
     randomized = _has(r"randomi[sz]ed|placebo-controlled", t + " " + a)
     if randomized and _has(r"post[- ]hoc|prespecified|pre-specified|secondary analysis|subgroup|according to", t + " " + a):
