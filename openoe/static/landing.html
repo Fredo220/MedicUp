@@ -20,7 +20,7 @@ nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
 .links{display:flex;gap:22px;color:var(--muted);font-size:14.5px}
 .links a:hover{color:var(--fg)}
 .sp{flex:1}
-.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font-weight:550;font-size:15px;transition:transform .15s,opacity .15s,background .15s}
+.btn{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font-weight:550;font-size:15px;transition:transform .15s,opacity .15s,background .15s}
 .btn:hover{transform:translateY(-1px)}
 .btn.primary{background:var(--fg);color:var(--bg)}
 .btn.ghost{border:1px solid var(--line);color:var(--fg)}
@@ -79,7 +79,7 @@ footer a{text-decoration:underline;text-underline-offset:3px}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.paint img{transform:none;transition:none}}
 @media (max-width:900px){.links{display:none}.split,.split.rev{grid-template-columns:1fr;gap:32px}.split.rev .paint{order:0}.steps{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr 1fr}header.hero{padding-top:56px}section{padding:64px 0}}
-@media (max-width:520px){.steps,.feat{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stats div+div{border-left:0;border-top:1px solid var(--line)}}
+@media (max-width:520px){.paint figcaption{display:none}.btn.sm{padding:0 12px}.steps,.feat{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stats div+div{border-left:0;border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>

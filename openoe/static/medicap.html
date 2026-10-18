@@ -177,7 +177,7 @@ pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);bord
 #graph .dot{transition:r .2s}
 #graph .card rect.bg{fill:var(--surface);stroke-width:2;transition:stroke-width .2s}
 #graph .card rect.ph{fill:var(--border)}
-#graph .card image{transition:filter .35s,opacity .35s}
+#graph .card image{opacity:0;transition:filter .35s,opacity .35s}
 #graph .card.ready image{filter:blur(5px) grayscale(.5);opacity:.45}
 #graph .node.hot .card.ready image{filter:none;opacity:1}
 #graph .card rect.bg{transition:stroke-opacity .35s}
@@ -624,7 +624,7 @@ function renderGraph(animate=true){
         <line class="stem" x1="${x}" y1="${up?y-r:y+r}" x2="${x}" y2="${up?cy+ch:cy}" stroke="${col}"/>
         <rect class="bg" x="${cx-3}" y="${cy-3}" width="${cw+6}" height="${ch+6}" rx="7" stroke="${col}"/>
         <rect class="ph" x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="5"/>
-        <image x="${cx}" y="${cy}" width="${cw}" height="${ch}" preserveAspectRatio="xMidYMid meet" referrerpolicy="no-referrer" style="opacity:0"/>
+        <image x="${cx}" y="${cy}" width="${cw}" height="${ch}" preserveAspectRatio="xMidYMid meet" referrerpolicy="no-referrer"/>
       </g>
       <circle class="dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>
       <text class="${k.startsWith("S")?"sl":"rk"}" x="${x}" y="${ly}">${label}</text></g></g>`};
