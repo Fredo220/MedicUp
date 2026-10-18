@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -115,6 +116,8 @@ class TavilySource:
         )
         results = data.get("results", [])
         log.info("Tavily [%s] %r → %d results", route_name, q[:50], len(results))
+        years = (filters or {}).get("date_range_years")
+        cutoff = date.today().year - int(years) if years else None
 
         docs: List[Document] = []
         for rank, item in enumerate(results, 1):
@@ -123,6 +126,9 @@ class TavilySource:
             if not title or not url:
                 continue
             content = clean(item.get("content", ""))
+            year = _year(item.get("published_date") or "")
+            if cutoff and (year is None or year < cutoff):
+                continue  # can't verify the date → don't let it bypass the request's date filter
             docs.append(Document(
                 id=url,
                 source="tavily",
@@ -130,8 +136,15 @@ class TavilySource:
                 doc_type="paper",
                 title=title,
                 content=content,
-                metadata={"url": url, "domain": domain(url), **extract_ids(url, content)},
+                metadata={"url": url, "domain": domain(url), **extract_ids(url, content),
+                          **({"publication_year": year} if year else {})},
                 score=float(item.get("score") or 0.0),
                 score_type="tavily",
             ))
         return docs
+
+
+def _year(published: str) -> Optional[int]:
+    m = re.match(r"(\d{4})", published.strip())
+    return int(m.group(1)) if m else None
+

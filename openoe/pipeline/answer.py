@@ -217,6 +217,9 @@ def _fmt_paper(i: int, s: Dict) -> str:
             doi_norm = doi_norm[len(p):].strip()
             break
     doi_link = f" | [DOI](https://doi.org/{quote(doi_norm)})" if doi_norm else ""
+    url = str(s.get("url", ""))
+    if not pmid_link and not doi_link and url.startswith(("http://", "https://")):
+        doi_link = f"[{s.get('domain') or 'Source'}]({url})"
 
     info = journal or ""
     if if_:
@@ -241,7 +244,8 @@ def _fmt_guideline(i: int, s: Dict) -> str:
     title = s.get("title", "N/A")
     n = len(s.get("relevant_chunks", []))
     badge = "![Guideline](https://img.shields.io/badge/Guideline-red)"
-    return f"#### ^{i}: {title}\n\n临床指南{badge}，相关段落：{n}\n\n"
+    score = f" · Score {s['score_pct']}%" if s.get("score_pct") else ""
+    return f"#### ^{i}: {title}\n\n临床指南{badge}，相关段落：{n}{score}\n\n"
 
 
 def _fmt_web(i: int, s: Dict) -> str:

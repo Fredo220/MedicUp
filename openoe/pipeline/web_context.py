@@ -66,6 +66,10 @@ def _same_paper(paper: Dict[str, Any], src: Dict[str, Any]) -> bool:
     pdoi = normalize_doi(paper.get("doi"))
     if pdoi and pdoi == normalize_doi(extract_ids(src["url"]).get("doi")):
         return True
+    # A matching headline alone may be news/commentary about the paper; only treat it as the paper
+    # itself when the page is a record page (its URL carries a DOI/PMID/PMCID).
+    if not extract_ids(src["url"]):
+        return False
     a, b = (paper.get("title") or "").lower(), src["title"].lower()
     return bool(a) and SequenceMatcher(None, a, b).ratio() >= 0.9
 

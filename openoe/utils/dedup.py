@@ -49,7 +49,9 @@ def dedup(
         dup = False
         for u in unique:
             if SequenceMatcher(None, t, " ".join(u.title.lower().split())).ratio() >= threshold:
-                if (d.score or 0) > (u.score or 0):
+                keep, other = (d, u) if (d.score or 0) > (u.score or 0) else (u, d)
+                _absorb(keep, other)
+                if keep is d:
                     unique.remove(u)
                     unique.append(d)
                 dup = True
@@ -57,3 +59,15 @@ def dedup(
         if not dup:
             unique.append(d)
     return sorted(unique, key=lambda d: d.score or 0, reverse=True)
+
+
+def _absorb(keep: Document, other: Document) -> None:
+    """Fill ``keep``'s metadata gaps from a fuzzy duplicate and union their ``found_via`` routes."""
+    meta = dict(keep.metadata)
+    for k, v in other.metadata.items():
+        if v and not meta.get(k):
+            meta[k] = v
+    via = list(keep.metadata.get("found_via") or [keep.route]) + list(other.metadata.get("found_via") or [other.route])
+    meta["found_via"] = list(dict.fromkeys(r for r in via if r))
+    keep.metadata = meta
+

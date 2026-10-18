@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +17,22 @@ from openoe.core.config import load_config, validate_config, apply_overrides
 from openoe.core.models import QueryRequest, QueryResponse
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
+from openoe.medicap import discover as medicap
 from openoe.pipeline.orchestrator import Orchestrator
 from openoe.sources.openalex import OpenAlexSource
 from openoe.sources.tavily import TavilySource
 
 log = logging.getLogger(__name__)
+
+
+class MedicapResolveRequest(BaseModel):
+    lines: List[str]
+
+
+class MedicapDiscoverRequest(BaseModel):
+    question: str = ""
+    seeds: List[str]
+    limit: int = Field(40, ge=5, le=100)
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -97,6 +110,21 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
             return {"error": "trace not found"}
         return t
 
+    # ── Medicap: seed-based discovery ─────────────────────────
+    @app.post("/api/medicap/resolve", tags=["medicap"])
+    async def medicap_resolve(body: MedicapResolveRequest):
+        return {"results": await medicap.resolve(body.lines[:50], app.state.config)}
+
+    @app.post("/api/medicap/discover", tags=["medicap"])
+    async def medicap_discover(body: MedicapDiscoverRequest):
+        return await medicap.discover(body.question, body.seeds[:30], app.state.config, llm=llm, limit=body.limit)
+
+    @app.get("/api/medicap/status", tags=["medicap"])
+    async def medicap_status():
+        c = app.state.config
+        return {"judge": medicap.llm_available(c),
+                "tavily": bool((c.get("stages", {}).get("web_context", {}) or {}).get("api_key"))}
+
     # ── WebSocket: real-time progress ─────────────────────────
     @app.websocket("/ws/query")
     async def ws_query(ws: WebSocket):
@@ -130,15 +158,13 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     # ── Frontend ──────────────────────────────────────────────
     @app.get("/", include_in_schema=False)
-    async def index():
-        html = _STATIC_DIR / "index.html"
-        if html.exists():
-            return FileResponse(html, media_type="text/html")
-        return {"message": "Open OE API — visit /docs for API documentation"}
-
     @app.get("/medicap", include_in_schema=False)
-    async def medicap():
+    async def medicap_ui():
         return FileResponse(_STATIC_DIR / "medicap.html", media_type="text/html")
+
+    @app.get("/qa", include_in_schema=False)
+    async def index():
+        return FileResponse(_STATIC_DIR / "index.html", media_type="text/html")
 
     if _STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

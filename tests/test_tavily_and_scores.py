@@ -91,7 +91,7 @@ def test_question_context_and_supporting_sources():
     ]
     n = asyncio.run(web_context.add_supporting_sources(papers, cfg, search=fake))
     assert n == 1
-    assert [s["url"] for s in papers[0]["supporting_sources"]] == ["https://trials.gov/c"]
+    assert [s["url"] for s in papers[0]["supporting_sources"]] == ["https://news.com/b", "https://trials.gov/c"]  # same-title commentary kept, DOI mirror dropped
     assert "supporting_sources" not in papers[1]
 
 

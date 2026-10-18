@@ -275,6 +275,9 @@ sup.cite:hover .cite-tooltip{opacity:1}
   function esc(s) {
     return String(s ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   }
+  function safeUrl(u) {
+    return /^https?:\/\//i.test(String(u || "")) ? esc(u) : "";
+  }
   function docType(c) {
     return (c.doc_type === "guideline" || c.doc_type === "web") ? c.doc_type : "paper";
   }
@@ -287,13 +290,13 @@ sup.cite:hover .cite-tooltip{opacity:1}
   function webLinks(list, label) {
     if (!list || !list.length) return "";
     return `<div class="ref-support"><span class="lbl">${label}</span>` +
-      list.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)} <span class="ref-year">${esc(s.domain)} · ${s.score_pct}%</span></a>`).join("") +
+      list.filter(s => safeUrl(s.url)).map(s => `<a href="${safeUrl(s.url)}" target="_blank" rel="noopener">${esc(s.title)} <span class="ref-year">${esc(s.domain)} · ${s.score_pct}%</span></a>`).join("") +
       `</div>`;
   }
 
   /* ── Mobile modal logic ──────────────────────── */
   function openRefModal(citation, num) {
-    const doiHref = buildDoiHref(citation.doi) || citation.url || "";
+    const doiHref = buildDoiHref(citation.doi) || safeUrl(citation.url);
     const doiDisplay = citation.doi ? buildDoiDisplay(citation.doi) : esc(citation.domain || "");
     const typeClass = docType(citation);
     const typeLabel = typeClass;
@@ -465,7 +468,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
         const refId = `ref-${eid}-${num}`;
         const typeClass = docType(c);
         const typeLabel = typeClass;
-        const doiHref = buildDoiHref(c.doi) || c.url || "";
+        const doiHref = buildDoiHref(c.doi) || safeUrl(c.url);
         const doiDisplay = c.doi ? buildDoiDisplay(c.doi) : esc(c.domain || "");
         const doiLink = doiHref ? `<a class="ref-doi" href="${doiHref}" target="_blank" rel="noopener">${doiDisplay}</a>` : "";
         const titleText = esc(c.title || "Untitled");
