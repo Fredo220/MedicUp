@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +40,8 @@ class OpenAlexSource:
     ) -> List[Document]:
         base = config.get("base_url", "https://api.openalex.org").rstrip("/")
         email = config.get("email")
+        api_key = config.get("api_key") or os.getenv("OPENALEX_API_KEY", "")
+        errors: List[str] = []
         hyde_text = config.get("hyde_text")  # injected by orchestrator
 
         fv = ["type:article"]
@@ -54,6 +57,8 @@ class OpenAlexSource:
             params: Dict[str, Any] = {"search": search_q, "per-page": n, "filter": filter_str}
             if email:
                 params["mailto"] = email
+            if api_key:
+                params["api_key"] = api_key
             try:
                 async with httpx.AsyncClient(timeout=30.0) as c:
                     r = await c.get(f"{base}/works", params=params)
@@ -65,6 +70,7 @@ class OpenAlexSource:
                     return results
             except Exception as e:
                 log.warning("OpenAlex [%s] failed: %s", label, e)
+                errors.append(str(e))
                 return []
 
         async def _semantic_search(text: str, label: str) -> List[Dict]:
@@ -81,6 +87,8 @@ class OpenAlexSource:
             params: Dict[str, Any] = {"search.semantic": truncated, "per-page": 50, "filter": filter_str}
             if email:
                 params["mailto"] = email
+            if api_key:
+                params["api_key"] = api_key
             try:
                 async with httpx.AsyncClient(timeout=30.0) as c:
                     r = await c.get(f"{base}/works", params=params)
@@ -91,6 +99,7 @@ class OpenAlexSource:
                     return results
             except Exception as e:
                 log.warning("OpenAlex [%s] semantic failed: %s", label, e)
+                errors.append(str(e))
                 return []
 
         # Run searches sequentially with 1s delay to respect rate limits
@@ -102,6 +111,9 @@ class OpenAlexSource:
         if hyde_text:
             await asyncio.sleep(1)
             all_batches.append(await _semantic_search(hyde_text, "semantic-hyde"))
+
+        if errors and not any(all_batches):
+            raise RuntimeError(f"OpenAlex unavailable: {errors[-1]}")
 
         # Merge and deduplicate by OpenAlex ID, preserving priority order
         seen: set[str] = set()

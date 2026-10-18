@@ -135,8 +135,8 @@ class Orchestrator:
         })
 
         if ctx.trace.retrieval and all(t.error for t in ctx.trace.retrieval):
-            log.error("└─ All retrieval routes failed!")
-            raise RuntimeError("All retrieval routes failed: " + "; ".join(f"{t.route}: {t.error}" for t in ctx.trace.retrieval))
+            log.error("└─ All retrieval routes failed: %s", "; ".join(f"{t.route}: {t.error}" for t in ctx.trace.retrieval))
+            return await self._no_sources_response(ctx, emit, t_total)
 
         # ── Stage 3: Merge ───────────────────────────────────
         await emit("merge", "Merging and de-duplicating…", {})

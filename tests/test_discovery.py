@@ -175,3 +175,22 @@ def test_plain_seed_labels_rewrites_internal_labels():
     from openoe.discovery.rank import plain_seed_labels
     assert plain_seed_labels("Same trial as S1 and the seed paper S2.") == "Same trial as your paper 1 and your paper 2."
     assert plain_seed_labels("SGLT2 inhibitors") == "SGLT2 inhibitors"
+
+
+def test_openalex_source_raises_when_database_unavailable(monkeypatch):
+    import asyncio
+    import httpx
+    import pytest
+    from openoe.sources import openalex as src
+
+    class Down:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **k): raise httpx.HTTPError("429 Too Many Requests")
+
+    async def no_sleep(_): return None
+    monkeypatch.setattr(src.httpx, "AsyncClient", Down)
+    monkeypatch.setattr(src.asyncio, "sleep", no_sleep)
+    with pytest.raises(RuntimeError, match="OpenAlex unavailable"):
+        asyncio.run(src.OpenAlexSource().search(query="sglt2 hfpef", keywords=["sglt2 heart failure"]))

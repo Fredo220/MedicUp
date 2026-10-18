@@ -562,7 +562,7 @@ details.more[open] summary::before,details.comp[open] summary::before{content:"â
   function stageDetail(stage, data) {
     if (!data) return "";
     switch(stage) {
-      case "safety":    return data.flag ? data.flag : "";
+      case "safety":    return data.flag === "medical_related" ? "Medical question" : "";
       case "enhance":   return data.search_query ? `"${data.search_query}"` : "";
       case "retrieval": return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";
       case "merge":     return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";

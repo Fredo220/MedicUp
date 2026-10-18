@@ -10,6 +10,7 @@ retrieval:
       config:
         base_url: "https://api.openalex.org"
         email: "${OPENALEX_EMAIL:}"
+        api_key: "${OPENALEX_API_KEY:}"
       filters:
         date_range_years: 10
 
