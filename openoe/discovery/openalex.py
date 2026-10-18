@@ -1,6 +1,7 @@
 """Async OpenAlex client with request-local in-memory GET caching."""
 from __future__ import annotations
 
+import asyncio
 import copy
 import logging
 import os
@@ -108,6 +109,17 @@ class OpenAlexClient:
             {"filter": f"cites:{short_openalex_id(wid)}", "sort": "cited_by_count:desc", "per-page": n},
         )
         return data.get("results", []) if isinstance(data, dict) else []
+
+    async def lookup(self, q: str, n: int = 8) -> List[Dict[str, Any]]:
+        """Search works for seed resolution; does not use the discovery search budget."""
+        by_relevance, by_citations = await asyncio.gather(
+            self._get(f"{self.base_url}/works", {"search": q, "per-page": n}),
+            self._get(f"{self.base_url}/works", {"search": q, "sort": "cited_by_count:desc", "per-page": n}),
+        )
+        results: List[Dict[str, Any]] = []
+        for data in (by_relevance, by_citations):
+            results.extend(data.get("results", []) if isinstance(data, dict) else [])
+        return results
 
     async def search(self, q: str, n: int = 15) -> List[Dict[str, Any]]:
         if self.search_calls >= 3:

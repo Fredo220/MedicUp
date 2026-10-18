@@ -146,3 +146,32 @@ def test_embedding_batches_preserve_order_with_concurrent_http_posts(monkeypatch
 
     assert embeddings == [[float(index)] for index in range(129)]
     assert 2 <= max_active_posts <= 4
+
+
+def test_study_type_labels_only_what_title_or_abstract_states():
+    from openoe.discovery.models import study_type
+    assert study_type("SGLT2 inhibitors in heart failure: a meta-analysis of five trials", "randomized") == "Meta-analysis"
+    assert study_type("2023 Focused Update of the 2021 ESC Guidelines for heart failure") == "Guideline"
+    assert study_type("Empagliflozin in Heart Failure", "In this double-blind trial, we randomly assigned... placebo-controlled") == "RCT"
+    assert study_type("Dapagliflozin for heart failure according to body mass index: the DELIVER trial", "randomized") == "Trial sub-analysis"
+    assert study_type("Rationale and design of the DELIVER trial", "randomized") == "Trial design"
+    assert study_type("A retrospective cohort of DOAC users", "") == "Observational"
+    assert study_type("EMPEROR-Preserved: a promise fulfilled", "", "editorial") == "Editorial"
+    assert study_type("Heart failure therapy", "", "review") == "Review"
+    assert study_type("Heart failure therapy", "") is None
+
+
+def test_pick_title_match_prefers_primary_report_and_rejects_nonsense():
+    from openoe.discovery.models import Paper
+    from openoe.discovery.seeds import pick_title_match
+    primary = Paper(openalex_id="W1", title="Empagliflozin in Heart Failure with a Preserved Ejection Fraction",
+                    abstract="EMPEROR-Preserved trial ...", cited_by_count=3000)
+    editorial = Paper(openalex_id="W2", title="EMPEROR-Preserved: A promise fulfilled", cited_by_count=12)
+    assert pick_title_match("EMPEROR-Preserved", [editorial, primary]).openalex_id == "W1"
+    assert pick_title_match("asdf qwer", [editorial, primary]) is None
+
+
+def test_plain_seed_labels_rewrites_internal_labels():
+    from openoe.discovery.rank import plain_seed_labels
+    assert plain_seed_labels("Same trial as S1 and the seed paper S2.") == "Same trial as your paper 1 and your paper 2."
+    assert plain_seed_labels("SGLT2 inhibitors") == "SGLT2 inhibitors"

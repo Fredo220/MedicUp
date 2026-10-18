@@ -28,7 +28,9 @@ class Paper(BaseModel):
     related_works: List[str] = Field(default_factory=list, exclude=True)
 
     def to_api_dict(self) -> Dict[str, Any]:
-        return self.model_dump(exclude={"referenced_works", "related_works"})
+        data = self.model_dump(exclude={"referenced_works", "related_works"})
+        data["study_type"] = study_type(self.title, self.abstract, self.type)
+        return data
 
 
 class DiscoverRequest(BaseModel):
@@ -52,6 +54,36 @@ class FollowupRequest(BaseModel):
     question: str
     history: List[Dict[str, str]] = Field(default_factory=list)
     papers: List[Dict[str, Any]]
+
+
+def _has(pattern: str, text: str) -> bool:
+    return re.search(pattern, text) is not None
+
+
+def study_type(title: str, abstract: str = "", work_type: Optional[str] = None) -> Optional[str]:
+    """Plain-language evidence type, only when the title or abstract states it."""
+    t = (title or "").casefold()
+    a = (abstract or "").casefold()
+    if work_type in {"editorial", "letter", "erratum"}:
+        return "Editorial"
+    if _has(r"meta-?analys|systematic review", t):
+        return "Meta-analysis"
+    if _has(r"guideline|consensus|position statement|scientific statement|focused update|recommendations", t):
+        return "Guideline"
+    if _has(r"rationale and design|design and rationale|study design|protocol", t):
+        return "Trial design"
+    if _has(r"pooled analysis", t):
+        return "Pooled analysis"
+    randomized = _has(r"randomi[sz]ed|placebo-controlled", t + " " + a)
+    if randomized and _has(r"post[- ]hoc|prespecified|pre-specified|secondary analysis|subgroup|according to", t + " " + a):
+        return "Trial sub-analysis"
+    if randomized and work_type != "review":
+        return "RCT"
+    if work_type == "review" or _has(r"\breview\b", t):
+        return "Review"
+    if _has(r"cohort|registry|retrospective|observational|real-world|case-control|cross-sectional", t + " " + a):
+        return "Observational"
+    return None
 
 
 def short_openalex_id(value: Any) -> str:

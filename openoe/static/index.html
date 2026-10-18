@@ -338,34 +338,48 @@ sup.cite:hover{background:var(--accent);color:#fff}
 .footer{color:var(--muted);font-size:.75rem;padding:40px 20px;border-top:none}
 .web-item p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .chat .cite-tooltip{max-width:260px;white-space:normal}
+/* Doctor-friendly additions */
+.stype{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 8px;margin-right:6px;border-radius:999px;background:#f1f1ef;color:var(--text2)}
+.stype.strong{background:var(--accent-dim);color:var(--accent)}
+details.more{flex-basis:100%}
+details.more summary,details.comp summary{cursor:pointer;color:var(--text2);font-size:.82rem;list-style:none}
+details.more summary::before,details.comp summary::before{content:"▸ "}
+details.more[open] summary::before,details.comp[open] summary::before{content:"▾ "}
+.more-body{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:10px}
+.chat{margin:0 0 18px}
+.fu-chips{justify-content:flex-start;margin:6px 0 10px;padding:0}
+.pscore b{display:block}
+.answer-card>p:first-child{background:var(--accent-dim);border-radius:10px;padding:12px 14px}
+@media (max-width:600px){.disc-form{margin:20px 12px 8px;padding:18px 16px}.disc-form input,.disc-form textarea{width:100%;min-width:0}.toolbar select{max-width:100%}.pscore{min-width:72px;font-size:.7rem}}
 </style>
 </head>
 <body>
 <header class="header">
   <h1>Medic<em>Up</em></h1>
-  <p>Start from papers you trust. Discover the ones you're missing.</p>
+  <p>Clinical questions answered from the medical literature, with sources.</p>
   <div class="tabs">
-    <button class="tab active" data-tab="discover">Discover papers</button>
-    <button class="tab" data-tab="ask">Ask the literature</button>
+    <button class="tab active" data-tab="ask">Ask a question</button>
+    <button class="tab" data-tab="discover">Find more papers</button>
   </div>
 </header>
 
-<section class="panel active" id="panel-discover">
+<section class="panel" id="panel-discover">
   <form class="disc-form" id="discForm" autocomplete="off">
-    <label for="discQuestion">Research question (optional)</label>
-    <input id="discQuestion" type="text" placeholder="e.g. Which immune checkpoint inhibitor combinations improve survival in metastatic melanoma?">
-    <label for="discSeeds">Seed papers — one per line (DOI, PMID, PubMed/DOI/OpenAlex URL, or title)</label>
-    <textarea id="discSeeds" placeholder="10.1056/NEJMoa1003466&#10;10.1056/NEJMoa1504030"></textarea>
+    <label for="discSeeds">Papers you already know — one per line</label>
+    <textarea id="discSeeds" placeholder="EMPEROR-Preserved&#10;Dapagliflozin in Heart Failure with Mildly Reduced or Preserved Ejection Fraction"></textarea>
+    <span class="hint">A paper title, trial name, DOI or PubMed ID all work.</span>
+    <label for="discQuestion">What do you want to know? (optional)</label>
+    <input id="discQuestion" type="text" placeholder="e.g. Do SGLT2 inhibitors help patients with HFpEF?">
     <div class="row">
-      <button class="btn" type="submit" id="discBtn">Discover</button>
-      <button class="btn ghost" type="button" id="discExample">Load example</button>
-      <span class="hint">Combines citation links, Semantic Scholar recommendations, Nebius embeddings, OpenAlex search and Tavily web search; ranked and explained by an LLM.</span>
+      <button class="btn" type="submit" id="discBtn">Find papers</button>
+      <button class="btn ghost" type="button" id="discExample">Try an example</button>
+      <span class="hint">We follow citations, look for similar studies and search the web, then explain why each paper fits. Takes about 30 seconds.</span>
     </div>
   </form>
   <div class="container">
     <div class="progress-section" id="discProgress">
       <div class="progress-card">
-        <div class="progress-title">Discovering…</div>
+        <div class="progress-title">Finding papers… usually 20–40 seconds</div>
         <div class="progress-bar-track"><div class="progress-bar-fill" id="discBar"></div></div>
         <div class="stage-list" id="discStages"></div>
       </div>
@@ -375,57 +389,65 @@ sup.cite:hover{background:var(--accent);color:#fff}
       <div class="seeds-bar" id="seedsBar"></div>
       <div id="unresolved"></div>
       <div class="toolbar" id="toolbar">
-        <span>Sort <select id="fSort"><option value="score">Relevance score</option><option value="year">Newest</option><option value="cites">Most cited</option></select></span>
+        <span>Sort <select id="fSort"><option value="score">Best match</option><option value="year">Newest</option><option value="cites">Most cited</option></select></span>
+        <span>Evidence <select id="fType"><option value="">All types</option><option value="strong">RCTs, meta-analyses &amp; guidelines</option><option value="Meta-analysis">Meta-analyses</option><option value="RCT">RCTs</option><option value="Guideline">Guidelines</option><option value="Review">Reviews</option><option value="Observational">Observational</option></select></span>
+        <label><input type="checkbox" id="fOA"> Free full text</label>
+        <button class="btn" type="button" id="rerunBtn" disabled>Update results with my picks</button>
+        <details class="more"><summary>More options</summary><div class="more-body">
         <span>From year <input type="number" id="fYear" placeholder="any"></span>
-        <label><input type="checkbox" id="fOA"> Open access only</label>
-        <label><input type="checkbox" id="fVerified"> Verified quote only</label>
-        <span>Found via <select id="fSignal"><option value="">any signal</option><option value="cited_by_seeds">Cited by seeds</option><option value="cites_seeds">Cites seeds</option><option value="related">Related to seeds</option><option value="s2_recommendation">Semantic Scholar rec.</option><option value="search">Search</option><option value="web">Web (Tavily)</option></select></span>
-        <input type="text" id="fText" placeholder="Filter text…">
+        <label><input type="checkbox" id="fVerified"> Quote confirmed in abstract</label>
+        <span>Found via <select id="fSignal"><option value="">any route</option><option value="cited_by_seeds">Cited by your papers</option><option value="cites_seeds">Cites your papers</option><option value="related">Similar to your papers</option><option value="s2_recommendation">Recommended (Semantic Scholar)</option><option value="search">Literature search</option><option value="web">Web</option></select></span>
+        <input type="text" id="fText" placeholder="Filter by word…">
         <button class="btn ghost" type="button" id="graphBtn">Show map</button>
-        <button class="btn ghost" type="button" id="csvBtn">Export CSV</button>
-        <button class="btn" type="button" id="rerunBtn" disabled>Re-run with feedback</button>
+        <button class="btn ghost" type="button" id="csvBtn">Download list (CSV)</button>
+        </div></details>
       </div>
       <div class="graph-wrap" id="graphWrap"></div>
       <div class="disc-layout">
         <div>
           <div class="stats-bar" id="discStats" style="margin-bottom:12px"></div>
-          <div id="cards"></div>
           <div class="chat" id="chat">
-            <h3>Ask follow-up questions about these papers</h3>
+            <h3>Ask about these papers</h3>
+            <div class="examples fu-chips" id="fuChips">
+              <span class="chip" data-fq="Which of these are randomized trials, and what did they find?">Which are RCTs?</span>
+              <span class="chip" data-fq="Summarize the main findings in 3 short bullet points.">Main findings in 3 bullets</span>
+              <span class="chip" data-fq="What do these papers report about safety and side effects?">Safety &amp; side effects</span>
+            </div>
             <div id="chatLog"></div>
             <form class="chat-box" id="chatForm" autocomplete="off">
-              <input id="chatInput" type="text" placeholder="e.g. Which of these are randomized trials, and what did they find?">
+              <input id="chatInput" type="text" placeholder="Ask a question about the papers below">
               <button class="btn" type="submit" id="chatBtn">Ask</button>
             </form>
           </div>
+          <div id="cards"></div>
         </div>
         <aside class="side">
-          <div class="box"><h3>How the score works</h3><p class="hint">60% LLM relevance judgement (Nebius) + 40% pre-score: embedding similarity to your question and seeds (50%), number of seeds linked by citations (30%), number of independent signals (10%), Semantic Scholar recommendation (10%). Quotes are checked word-for-word against the abstract.</p></div>
-          <div class="box" id="webBox"><h3>Web context (Tavily)</h3><div id="webList" class="hint">None</div></div>
+          <div class="box"><h3>How matches are ranked</h3><p class="hint">An AI model reads each abstract and rates how well it fits your question and papers (60%). The rest comes from how closely the paper is linked to yours: shared citations, similar content and independent recommendations (40%). Quotes are checked word-for-word against the abstract. Always open the source before relying on a result.</p></div>
+          <div class="box" id="webBox"><h3>Web sources</h3><div id="webList" class="hint">None</div></div>
         </aside>
       </div>
     </div>
   </div>
 </section>
 
-<section class="panel" id="panel-ask">
+<section class="panel active" id="panel-ask">
 <div class="search-wrap">
   <form class="search-box" id="searchForm" autocomplete="off">
-    <input type="text" id="queryInput" placeholder="Ask a medical research question…">
-    <button type="submit" id="submitBtn">Search</button>
+    <input type="text" id="queryInput" placeholder="Ask a clinical question, in any language" aria-label="Clinical question">
+    <button type="submit" id="submitBtn">Ask</button>
   </form>
 </div>
-<div class="thread-actions"><button class="btn ghost" type="button" id="newThread">New conversation</button></div>
+<div class="thread-actions"><button class="btn ghost" type="button" id="newThread" hidden>Start a new topic</button></div>
 <div class="examples" id="examples">
-  <span class="chip" data-q="What are the safety considerations when using JAK inhibitors?">JAK inhibitor safety</span>
-  <span class="chip" data-q="What are the main safety risks of GLP-1 receptor agonists?">GLP-1 agonist risks</span>
-  <span class="chip" data-q="How should HbA1c targets be set for patients with type 2 diabetes?">HbA1c targets</span>
-  <span class="chip" data-q="Can patients with recurrent ovarian cancer who already received bevacizumab benefit from anti-angiogenic re-treatment?">Ovarian cancer re-treatment</span>
+  <span class="chip" data-q="In an elderly patient with atrial fibrillation and CKD stage 3b, is apixaban safer than rivaroxaban for bleeding?">Apixaban vs rivaroxaban in CKD</span>
+  <span class="chip" data-q="What is the best H. pylori eradication regimen for a penicillin-allergic patient?">H. pylori with penicillin allergy</span>
+  <span class="chip" data-q="Do SGLT2 inhibitors reduce hospitalisation in heart failure with preserved ejection fraction?">SGLT2 inhibitors in HFpEF</span>
+  <span class="chip" data-q="What HbA1c target is appropriate for frail older adults with type 2 diabetes?">HbA1c target in frail elderly</span>
 </div>
 <div class="container">
   <div class="progress-section" id="progressSection">
     <div class="progress-card">
-      <div class="progress-title">Working…</div>
+      <div class="progress-title">Searching the literature… usually 30–60 seconds</div>
       <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar"></div></div>
       <div class="stage-list" id="stageList"></div>
     </div>
@@ -440,19 +462,19 @@ sup.cite:hover{background:var(--accent);color:#fff}
     <div id="refModalBody"></div>
   </div>
 </div>
-<footer class="footer">MedicUp · for research only · not medical advice · data: OpenAlex, Semantic Scholar, Tavily · AI: Nebius Token Factory</footer>
+<footer class="footer">MedicUp supports research and does not replace clinical judgement · Sources: OpenAlex, Semantic Scholar, web (Tavily) · AI: Nebius Token Factory</footer>
 
 <script>
 (function(){
   "use strict";
 
   const STAGES = [
-    {key:"safety",   label:"Safety check"},
-    {key:"enhance",  label:"Query expansion"},
-    {key:"retrieval",label:"Literature search"},
-    {key:"merge",    label:"De-duplicate"},
-    {key:"filter",   label:"Relevance filter"},
-    {key:"answer",   label:"Write answer"},
+    {key:"safety",   label:"Checking your question"},
+    {key:"enhance",  label:"Preparing the search"},
+    {key:"retrieval",label:"Searching the medical literature"},
+    {key:"merge",    label:"Removing duplicates"},
+    {key:"filter",   label:"Keeping only relevant studies"},
+    {key:"answer",   label:"Writing the answer"},
     {key:"done",     label:"Done"}
   ];
 
@@ -479,7 +501,7 @@ sup.cite:hover{background:var(--accent);color:#fff}
     const chip = e.target.closest(".chip");
     if (!chip) return;
     input.value = chip.dataset.q;
-    input.focus();
+    form.requestSubmit();
   });
 
   /* ── Submit ───────────────────────────────────── */
@@ -644,7 +666,7 @@ sup.cite:hover{background:var(--accent);color:#fff}
     const card = document.createElement("div");
     card.className = "answer-card";
     const rawAnswer = data.answer || "";
-    let html = marked.parse(rawAnswer);
+    let html = marked.parse(rawAnswer.replace(/~/g, "\\~"));
     html = html.replace(/\[\^(\d+)\]/g, (_, n) => {
       const ci = parseInt(n, 10) - 1;
       const title = (citations[ci] && citations[ci].title) ? citations[ci].title.replace(/"/g, '&quot;') : `Ref ${n}`;
@@ -696,15 +718,10 @@ sup.cite:hover{background:var(--accent);color:#fff}
     const statsDiv = document.createElement("div");
     statsDiv.className = "stats-bar";
     statsDiv.innerHTML =
-      `<span>Retrieved <span class="accent">${stats.papers_retrieved ?? "–"}</span></span>` +
-      `<span class="sep">→</span>` +
-      `<span>Merged <span class="accent">${stats.papers_after_merge ?? "–"}</span></span>` +
-      `<span class="sep">→</span>` +
-      `<span>Relevant <span class="accent">${stats.papers_after_filter ?? "–"}</span></span>` +
-      `<span class="sep">→</span>` +
-      `<span>Cited <span class="accent">${citations.length}</span></span>` +
-      `<span class="sep">|</span>` +
-      `<span>Time <span class="accent">${totalSec}s</span></span>`;
+      `<span>Screened <span class="accent">${stats.papers_after_merge ?? stats.papers_retrieved ?? "–"}</span> papers</span><span class="sep">·</span>` +
+      `<span><span class="accent">${stats.papers_after_filter ?? "–"}</span> relevant</span><span class="sep">·</span>` +
+      `<span><span class="accent">${citations.length}</span> cited</span><span class="sep">·</span><span>${totalSec} s</span>` +
+      `<span class="sep">·</span><span>Check the cited sources before clinical decisions.</span>`;
     statsWrap.appendChild(statsDiv);
     entry.appendChild(statsWrap);
 
@@ -767,6 +784,8 @@ sup.cite:hover{background:var(--accent);color:#fff}
     renderResult(question, data);
     convo.push({role:"user",content:question},{role:"assistant",content:(data.answer||"").slice(0,4000)});
     input.value = "";
+    input.placeholder = "Ask a follow-up question";
+    document.getElementById("newThread").hidden = false;
     input.focus();
   }
 
@@ -814,13 +833,16 @@ document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+t.dataset.tab));
 }));
-const STAGES=[{key:"seeds",label:"Resolve seed papers"},{key:"candidates",label:"Collect candidates (citations, recommendations, search, web)"},{key:"rank",label:"Embed & pre-rank (Nebius embeddings)"},{key:"judge",label:"LLM relevance judgement & explanations"},{key:"done",label:"Done"}];
-const SIGLABEL={cited_by_seeds:"Cited by",cites_seeds:"Cites",related:"Related to",s2_recommendation:"Semantic Scholar rec.",search:"Search",web:"Web"};
+const STAGES=[{key:"seeds",label:"Finding your papers"},{key:"candidates",label:"Following citations, similar studies and the web"},{key:"rank",label:"Sorting by closeness to your papers"},{key:"judge",label:"Reading abstracts and explaining each match"},{key:"done",label:"Done"}];
+const STRONG=new Set(["Meta-analysis","RCT","Guideline","Pooled analysis","Trial sub-analysis"]);
+const yours=a=>(a||[]).map(i=>"your paper "+(i+1)).join(", ");
+const plainSeeds=t=>String(t||"").replace(/\bS(\d+)\b/g,"your paper $1");
+const matchLabel=s=>s>=0.75?"Strong match":s>=0.55?"Good match":"Possible match";
 let state={req:null,data:null,liked:new Set(),disliked:new Set(),chat:[]};
 
 $("discExample").addEventListener("click",()=>{
-  $("discQuestion").value="Which immune checkpoint inhibitor combinations improve survival in metastatic melanoma?";
-  $("discSeeds").value="10.1056/NEJMoa1003466\n10.1056/NEJMoa1504030";
+  $("discQuestion").value="Do SGLT2 inhibitors help patients with heart failure with preserved ejection fraction?";
+  $("discSeeds").value="Empagliflozin in Heart Failure with a Preserved Ejection Fraction\nDapagliflozin in Heart Failure with Mildly Reduced or Preserved Ejection Fraction";
 });
 $("discForm").addEventListener("submit",e=>{
   e.preventDefault();
@@ -847,10 +869,10 @@ function stage(key,msg){
   $("discBar").style.width=Math.round((idx+1)/STAGES.length*100)+"%";
 }
 function run(req){
-  state.req=req; $("discBtn").disabled=true; $("rerunBtn").disabled=true; $("rerunBtn").textContent="Re-run with feedback"; $("discError").innerHTML="";
+  state.req=req; $("discBtn").disabled=true; $("rerunBtn").disabled=true; $("rerunBtn").textContent="Update results with my picks"; $("discError").innerHTML="";
   $("discProgress").classList.add("active"); stages();
   let done=false;
-  const fail=m=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; $("discError").innerHTML=`<div class="error-msg">Discovery failed: ${esc(m)}</div>`; };
+  const fail=m=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; $("discError").innerHTML=`<div class="error-msg">Search failed: ${esc(m)}. Please check the paper names and try again.</div>`; };
   const finish=d=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; state.data=d; state.chat=[]; $("chatLog").innerHTML=""; render(); };
   const post=()=>fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(req)}).then(r=>{if(!r.ok)return r.text().then(t=>{throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`)});return r.json();}).then(finish).catch(e=>fail(e.message));
   let ws; try{ws=new WebSocket(`${location.protocol==="https:"?"wss:":"ws:"}//${location.host}/ws/discover`);}catch(_){return post();}
@@ -863,13 +885,12 @@ function run(req){
 }
 
 function sigText(s,seeds){
-  const S=a=>(a||[]).map(i=>"S"+(i+1)).join(", ");
   switch(s.type){
-    case "cited_by_seeds":return `Cited by ${S(s.seeds)}`;
-    case "cites_seeds":return `Cites ${S(s.seeds)}`;
-    case "related":return `Related to ${S(s.seeds)}`;
-    case "s2_recommendation":return `Semantic Scholar rec. #${s.rank}`;
-    case "search":return `Search: “${s.query}”`;
+    case "cited_by_seeds":return `Cited by ${yours(s.seeds)}`;
+    case "cites_seeds":return `Cites ${yours(s.seeds)}`;
+    case "related":return `Similar to ${yours(s.seeds)}`;
+    case "s2_recommendation":return "Recommended by Semantic Scholar";
+    case "search":return `Literature search: “${s.query}”`;
     case "web":{let h=s.url;try{h=new URL(s.url).hostname.replace(/^www\./,"");}catch(_){}return `Web: ${h}`;}
     default:return s.type;
   }
@@ -877,24 +898,23 @@ function sigText(s,seeds){
 function sigClass(t){return t==="web"?"web":(t==="cited_by_seeds"||t==="cites_seeds"||t==="related")?"cite":"";}
 function filtered(){
   const d=state.data; if(!d)return [];
-  const y=parseInt($("fYear").value,10), oa=$("fOA").checked, ver=$("fVerified").checked, sg=$("fSignal").value, tx=$("fText").value.trim().toLowerCase();
-  let r=(d.results||[]).filter(p=>(!y||(p.year||0)>=y)&&(!oa||p.is_oa)&&(!ver||p.quote_verified)&&(!sg||(p.signals||[]).some(s=>s.type===sg))&&(!tx||((p.title||"")+" "+(p.abstract||"")+" "+(p.why||"")).toLowerCase().includes(tx)));
+  const ty=$("fType").value, y=parseInt($("fYear").value,10), oa=$("fOA").checked, ver=$("fVerified").checked, sg=$("fSignal").value, tx=$("fText").value.trim().toLowerCase();
+  let r=(d.results||[]).filter(p=>(!ty||(ty==="strong"?STRONG.has(p.study_type):p.study_type===ty))&&(!y||(p.year||0)>=y)&&(!oa||p.is_oa)&&(!ver||p.quote_verified)&&(!sg||(p.signals||[]).some(s=>s.type===sg))&&(!tx||((p.title||"")+" "+(p.abstract||"")+" "+(p.why||"")).toLowerCase().includes(tx)));
   const k=$("fSort").value;
   if(k==="year")r.sort((a,b)=>(b.year||0)-(a.year||0)); else if(k==="cites")r.sort((a,b)=>(b.cited_by_count||0)-(a.cited_by_count||0)); else r.sort((a,b)=>a.rank-b.rank);
   return r;
 }
-["fSort","fYear","fOA","fVerified","fSignal","fText"].forEach(id=>$(id).addEventListener("input",()=>{renderCards();if($("graphWrap").classList.contains("open"))graph();}));
+["fSort","fType","fYear","fOA","fVerified","fSignal","fText"].forEach(id=>$(id).addEventListener("input",()=>{renderCards();if($("graphWrap").classList.contains("open"))graph();}));
 
 function render(){
   const d=state.data; $("discResults").style.display="block";
-  $("seedsBar").innerHTML=(d.seeds||[]).map((s,i)=>`<a class="seed-chip" href="${esc(s.links?.doi||s.links?.openalex||"#")}" target="_blank" rel="noopener" title="${esc(s.title)}"><b>S${i+1}</b>${esc(s.title)}${s.year?` (${s.year})`:""}</a>`).join("");
-  $("unresolved").innerHTML=(d.unresolved||[]).length?`<div class="warn-msg">Could not resolve: ${d.unresolved.map(esc).join(", ")}</div>`:"";
+  $("seedsBar").innerHTML=`<span class="hint">Your papers (check we found the right ones):</span>`+(d.seeds||[]).map((s,i)=>`<a class="seed-chip" href="${esc(s.links?.doi||s.links?.openalex||"#")}" target="_blank" rel="noopener" title="${esc(s.title)}"><b>${i+1}</b>${esc(s.title)}${s.year?` (${s.year})`:""}</a>`).join("");
+  $("unresolved").innerHTML=(d.unresolved||[]).length?`<div class="warn-msg">We couldn't find: ${d.unresolved.map(esc).join(", ")}. Try the full title, a DOI or a PubMed ID.</div>`:"";
   if((d.errors||[]).length)$("unresolved").innerHTML+=`<div class="warn-msg">Some sources were temporarily unavailable, so results may be incomplete: ${[...new Set(d.errors.map(e=>String(typeof e==="string"?e:JSON.stringify(e)).split(":")[0]))].map(esc).join(", ")}</div>`;
   const st=d.stats||{}, tm=d.timings||{};
   const totMs=tm.total_ms??tm.done??Object.values(tm).reduce((a,b)=>Math.max(a,+b||0),0); const tot=(totMs/1000).toFixed(1);
-  const sigCounts=st.signals||st.by_signal||{};
-  $("discStats").innerHTML=`<span>Seeds <span class="accent">${(d.seeds||[]).length}</span></span><span class="sep">→</span><span>Candidates <span class="accent">${st.n_candidates??"–"}</span></span><span class="sep">→</span><span>LLM-judged <span class="accent">${st.n_judged??"–"}</span></span><span class="sep">→</span><span>Shown <span class="accent">${(d.results||[]).length}</span></span><span class="sep">|</span>`+Object.entries(sigCounts).map(([k,v])=>`<span>${esc(SIGLABEL[k]||k)} <span class="accent">${v}</span></span>`).join("")+`<span class="sep">|</span><span>Time <span class="accent">${tot}s</span></span>`;
-  $("webList").innerHTML=(d.web_context||[]).length?d.web_context.map(w=>`<div class="web-item"><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join(""):"No web context (Tavily disabled or no results).";
+  $("discStats").innerHTML=`<span>Screened <span class="accent">${st.n_candidates??"–"}</span> papers</span><span class="sep">·</span><span>AI read <span class="accent">${st.n_judged??"–"}</span> abstracts</span><span class="sep">·</span><span><span class="accent">${(d.results||[]).length}</span> shown</span><span class="sep">·</span><span>${tot} s</span>`;
+  $("webList").innerHTML=(d.web_context||[]).length?d.web_context.map(w=>`<div class="web-item"><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join(""):"No web sources used for this search.";
   renderCards(); if($("graphWrap").classList.contains("open"))graph();
 }
 function renderCards(){
@@ -904,22 +924,22 @@ function renderCards(){
 function card(p){
   const id=p.openalex_id, L=p.links||{}, c=p.components||{};
   const sigs=(p.signals||[]).map(s=>`<span class="sig ${sigClass(s.type)}">${esc(sigText(s))}</span>`).join("")+(p.is_oa?`<span class="sig oa">Open access</span>`:"");
-  const rel=(p.related_seeds||[]).map(i=>"S"+(i+1)).join(", ");
-  const quote=p.quote?`<div class="quote ${p.quote_verified?"":"unv"}">“${esc(p.quote)}”<span class="qflag ${p.quote_verified?"ok":"no"}">${p.quote_verified?"✓ verified in abstract":"⚠ not found verbatim in abstract"}</span></div>`:`<div class="hint">No supporting quote from the abstract.</div>`;
+  const rel=yours(p.related_seeds);
+  const quote=p.quote?`<div class="quote ${p.quote_verified?"":"unv"}">“${esc(p.quote)}”<span class="qflag ${p.quote_verified?"ok":"no"}">${p.quote_verified?"✓ quoted from the abstract":"⚠ not found word-for-word in the abstract"}</span></div>`:`<div class="hint">No supporting quote from the abstract.</div>`;
   const links=[L.doi&&`<a href="${esc(L.doi)}" target="_blank" rel="noopener">DOI</a>`,L.pubmed&&`<a href="${esc(L.pubmed)}" target="_blank" rel="noopener">PubMed</a>`,L.openalex&&`<a href="${esc(L.openalex)}" target="_blank" rel="noopener">OpenAlex</a>`,p.oa_url&&`<a href="${esc(p.oa_url)}" target="_blank" rel="noopener">Full text</a>`].filter(Boolean).join("");
   const cls=state.liked.has(id)?" liked":state.disliked.has(id)?" disliked":"";
   const f=v=>v==null?"–":(+v).toFixed(2);
   return `<div class="pcard${cls}" id="pc-${esc(id)}">
 <div class="phead"><div class="prank">${p.rank}</div><div style="flex:1;min-width:0"><div class="ptitle">${L.doi||L.openalex?`<a href="${esc(L.doi||L.openalex)}" target="_blank" rel="noopener" style="color:inherit">${esc(p.title)}</a>`:esc(p.title)}</div>
-<div class="pmeta">${esc(Array.isArray(p.authors)?p.authors.join(", "):(p.authors||""))}${p.venue?` · ${esc(p.venue)}`:""}${p.year?` · ${p.year}`:""} · cited ${p.cited_by_count??0}×${p.type?` · ${esc(p.type)}`:""}</div></div>
-<div class="pscore"><b>${Math.round((p.score||0)*100)}</b>score<div class="scorebar"><i style="width:${Math.round((p.score||0)*100)}%"></i></div></div></div>
-<div class="why"><strong>Why relevant:</strong> ${esc(p.why||"—")}${rel?` <span class="hint">(relates to ${rel})</span>`:""}</div>
+<div class="pmeta">${p.study_type?`<span class="stype${STRONG.has(p.study_type)?" strong":""}">${esc(p.study_type)}</span>`:""}${esc(Array.isArray(p.authors)?p.authors.join(", "):(p.authors||""))}${p.venue?` · ${esc(p.venue)}`:""}${p.year?` · ${p.year}`:""} · cited ${p.cited_by_count??0}×</div></div>
+<div class="pscore" title="Match score ${Math.round((p.score||0)*100)}/100"><b>${Math.round((p.score||0)*100)}</b>${matchLabel(p.score||0)}<div class="scorebar"><i style="width:${Math.round((p.score||0)*100)}%"></i></div></div></div>
+<div class="why"><strong>Why it fits:</strong> ${esc(plainSeeds(p.why)||"—")}${rel?` <span class="hint">(relates to ${rel})</span>`:""}</div>
 ${quote}
 <div class="badges">${sigs}</div>
-<div class="comp">LLM relevance ${c.llm_relevance??"–"}/10 · similarity ${f(c.similarity)} · linked seeds ${c.seed_links??0} · signals ${c.n_signals??(p.signals||[]).length} · pre-score ${f(c.pre_score)}</div>
+<details class="comp"><summary>Score details</summary>AI relevance ${c.llm_relevance??"–"}/10 · text similarity ${f(c.similarity)} · linked to ${c.seed_links??0} of your papers · found by ${c.n_signals??(p.signals||[]).length} routes · link score ${f(c.pre_score)}</details>
 <div class="plinks" style="margin-top:8px">${links}
 <button type="button" data-act="abs" data-id="${esc(id)}">Abstract</button>
-<button type="button" data-act="like" data-id="${esc(id)}" class="${state.liked.has(id)?"on":""}">+ Add as seed</button>
+<button type="button" data-act="like" data-id="${esc(id)}" class="${state.liked.has(id)?"on":""}">+ More like this</button>
 <button type="button" data-act="dislike" data-id="${esc(id)}" class="${state.disliked.has(id)?"on":""}">− Not relevant</button></div>
 <div class="abstract" id="abs-${esc(id)}">${esc(p.abstract||"No abstract available.")}</div></div>`;
 }
@@ -929,7 +949,7 @@ $("cards").addEventListener("click",e=>{
   const [a,o]=b.dataset.act==="like"?[state.liked,state.disliked]:[state.disliked,state.liked];
   if(a.has(id))a.delete(id); else {a.add(id);o.delete(id);}
   $("rerunBtn").disabled=!(state.liked.size||state.disliked.size);
-  $("rerunBtn").textContent=`Re-run with feedback${state.liked.size||state.disliked.size?` (+${state.liked.size} / −${state.disliked.size})`:""}`;
+  $("rerunBtn").textContent=`Update results with my picks${state.liked.size||state.disliked.size?` (+${state.liked.size} / −${state.disliked.size})`:""}`;
   renderCards();
 });
 
@@ -943,29 +963,30 @@ function graph(){
     linked.forEach(k=>{if(sp[k])edges+=`<line x1="${sp[k].x}" y1="${sp[k].y}" x2="${rp[i].x}" y2="${rp[i].y}" stroke="rgba(15,118,110,.18)" stroke-width="1.2"/>`;});
     const r=7+(p.score||0)*10, col=(p.signals||[]).some(s=>s.type==="web")?"#f59e0b":linked.size?"#0f766e":"#93c5fd";
     nodes+=`<g style="cursor:pointer" data-id="${esc(p.openalex_id)}"><circle cx="${rp[i].x}" cy="${rp[i].y}" r="${r}" fill="${col}" fill-opacity=".75"><title>#${p.rank} ${esc(p.title)} (${p.year||""})</title></circle><text x="${rp[i].x}" y="${rp[i].y+3.5}" font-size="10" text-anchor="middle" fill="#ffffff" font-weight="700">${p.rank}</text></g>`;});
-  seeds.forEach((s,i)=>{nodes+=`<g><circle cx="${sp[i].x}" cy="${sp[i].y}" r="18" fill="#111111"><title>S${i+1} ${esc(s.title)}</title></circle><text x="${sp[i].x}" y="${sp[i].y+4}" font-size="11" text-anchor="middle" fill="#ffffff" font-weight="700">S${i+1}</text></g>`;});
-  $("graphWrap").innerHTML=`<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}<text x="12" y="20" fill="#a1a1a6" font-size="12">Seeds (black) in the centre · results closer = higher score · green = linked to seeds by citations · blue = found by similarity/search/recommendation · amber = web · click a node</text></svg>`;
+  seeds.forEach((s,i)=>{nodes+=`<g><circle cx="${sp[i].x}" cy="${sp[i].y}" r="18" fill="#111111"><title>Your paper ${i+1}: ${esc(s.title)}</title></circle><text x="${sp[i].x}" y="${sp[i].y+4}" font-size="11" text-anchor="middle" fill="#ffffff" font-weight="700">${i+1}</text></g>`;});
+  $("graphWrap").innerHTML=`<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}<text x="12" y="20" fill="#a1a1a6" font-size="12">Your papers (black) in the centre · closer = better match · green = linked by citations · blue = similar topic or search · amber = web · click a dot to jump to the paper</text></svg>`;
   $("graphWrap").querySelectorAll("g[data-id]").forEach(g=>g.addEventListener("click",()=>focusCard(g.dataset.id)));
 }
 function focusCard(id){const el=$("pc-"+id);if(!el)return;el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("hl");setTimeout(()=>el.classList.remove("hl"),2000);}
 
 $("csvBtn").addEventListener("click",()=>{
-  const rows=[["rank","score","title","year","venue","authors","doi","pubmed","openalex","cited_by","open_access","why","quote","quote_verified","signals"]];
-  filtered().forEach(p=>rows.push([p.rank,(p.score||0).toFixed(3),p.title,p.year,p.venue,Array.isArray(p.authors)?p.authors.join(", "):p.authors,p.links?.doi,p.links?.pubmed,p.links?.openalex,p.cited_by_count,p.is_oa,p.why,p.quote,p.quote_verified,(p.signals||[]).map(s=>sigText(s)).join("; ")]));
+  const rows=[["rank","score","study_type","title","year","venue","authors","doi","pubmed","openalex","cited_by","open_access","why","quote","quote_verified","signals"]];
+  filtered().forEach(p=>rows.push([p.rank,(p.score||0).toFixed(3),p.study_type,p.title,p.year,p.venue,Array.isArray(p.authors)?p.authors.join(", "):p.authors,p.links?.doi,p.links?.pubmed,p.links?.openalex,p.cited_by_count,p.is_oa,p.why,p.quote,p.quote_verified,(p.signals||[]).map(s=>sigText(s)).join("; ")]));
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="medicup-discovery.csv";a.click();
 });
 
+$("fuChips").addEventListener("click",e=>{const c=e.target.closest(".chip[data-fq]");if(!c)return;$("chatInput").value=c.dataset.fq;$("chatForm").requestSubmit();});
 $("chatForm").addEventListener("submit",e=>{
   e.preventDefault(); const q=$("chatInput").value.trim(); if(!q||!state.data)return;
   const papers=(state.data.results||[]).slice().sort((a,b)=>a.rank-b.rank).map(p=>({openalex_id:p.openalex_id,title:p.title,year:p.year,abstract:p.abstract,links:p.links,venue:p.venue,authors:p.authors}));
-  const log=$("chatLog"); log.insertAdjacentHTML("beforeend",`<div class="msg user">${esc(q)}</div><div class="msg bot hint" id="pending">Thinking…</div>`);
+  const log=$("chatLog"); log.insertAdjacentHTML("beforeend",`<div class="msg user">${esc(q)}</div><div class="msg bot hint" id="pending">Reading the papers… (about 10–20 s)</div>`);
   $("chatInput").value=""; $("chatBtn").disabled=true;
   const hist=state.chat.slice();
   fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:hist,papers})})
   .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
   .then(d=>{
-    let h=marked.parse(d.answer||"");
+    let h=marked.parse((d.answer||"").replace(/~/g,"\\~"));
     h=h.replace(/\[\^(\d+)\]/g,(_,n)=>{const p=papers[+n-1];return `<sup class="cite" data-id="${p?esc(p.openalex_id):""}">${n}<span class="cite-tooltip">${p?esc(p.title):"Ref "+n}</span></sup>`;});
     $("pending").outerHTML=`<div class="msg bot">${h}</div>`;
     state.chat.push({role:"user",content:q},{role:"assistant",content:(d.answer||"").slice(0,4000)});

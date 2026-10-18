@@ -21,6 +21,17 @@ async def _noop_progress(stage: str, msg: str, data: Dict[str, Any]) -> None:
     pass
 
 
+
+NO_SOURCES_FOUND = (
+    "**No sources found.** We could not find studies in the literature that answer this question, "
+    "so we are not giving an answer. Try different wording or a broader question. "
+    "If this keeps happening, the literature database may be busy; please try again later."
+)
+NO_SOURCES_BUSY = (
+    "**No sources available right now.** The literature database did not respond (it may be busy), "
+    "so we are not giving an answer without sources. Please try again in a minute."
+)
+
 class Orchestrator:
     def __init__(
         self,
@@ -160,6 +171,9 @@ class Orchestrator:
             "papers_kept": len(ctx.filtered_papers), "total": len(ctx.merged_papers), "guidelines_kept": len(ctx.filtered_guidelines),
         })
 
+        if not ctx.filtered_papers and not ctx.filtered_guidelines:
+            return await self._no_sources_response(ctx, emit, t_total)
+
         # ── Stage 5: Answer ──────────────────────────────────
         await emit("answer", "Writing evidence-based answer…", {})
         t5 = time.perf_counter()
@@ -195,6 +209,22 @@ class Orchestrator:
         )
 
     # ── Helpers ───────────────────────────────────────────────
+
+    async def _no_sources_response(self, ctx: QueryContext, emit, t_total: float) -> QueryResponse:
+        """Never let the model answer a clinical question from memory when no sources were found."""
+        log.warning("└─ No relevant sources found; returning without an LLM answer")
+        busy = any(t.error for t in (ctx.trace.retrieval or []))
+        ctx.answer = NO_SOURCES_BUSY if busy else NO_SOURCES_FOUND
+        ctx.markdown = ctx.answer
+        ctx.cited_sources = []
+        ctx.trace.finish()
+        ctx.trace.time("total_ms", (time.perf_counter() - t_total) * 1000)
+        self.trace_store[ctx.trace.request_id] = self._serialize(ctx)
+        await emit("done", "No sources found", {"citations": 0})
+        return QueryResponse(
+            answer=ctx.answer, markdown=ctx.markdown, citations=[],
+            stats=self._stats(ctx), trace_id=ctx.trace.request_id, timings=ctx.trace.timings,
+        )
 
     def _safety_response(self, ctx: QueryContext, flag: str, reason: str) -> QueryResponse:
         if flag == "unsafe":
