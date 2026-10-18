@@ -139,7 +139,8 @@ generate_answer_v4: |
   3. If evidence conflicts: name the differences (method, population, endpoint), suggest reasons, give a cautious overall judgement and list open questions.
 
   ## Output structure (follow strictly)
-  - Start with a direct answer to the core question (about 100-200 words): the conclusion, the supporting evidence and its strength, and key numbers (effect sizes, 95% CI, NNT/NNH) when available.
+  - The very first line must be `**Bottom line:**` followed by one or two plain sentences a busy clinician can act on, including how strong the evidence is (e.g. "based on RCTs", "observational data only"), with citations. No heading before it.
+  - Then give a direct answer to the core question (about 100-200 words): the supporting evidence and its strength, and key numbers (effect sizes, 95% CI, NNT/NNH) when available.
   - Use numbered or bulleted lists; a small table is fine when it helps.
   - If the question is complex, add short sections (e.g. mechanism -> key studies -> benefit/risk -> open questions).
   - If good evidence is missing, say "No high-quality evidence found" explicitly.
@@ -150,7 +151,8 @@ generate_answer_v4: |
   - Never output a reference list at the end.
 
   ## Style
-  - Clear professional English, compact sentences, Markdown headings (##, ###) and lists.
+  - Clear professional language, compact sentences, Markdown headings (##, ###) and lists.
+  - Answer in the language the question was asked in (e.g. German question -> German answer); keep drug names, trial names and numbers unchanged.
 
   ## Input
   ### Retrieved passages (JSON):
@@ -176,6 +178,7 @@ discovery_judge: |
   Return JSON only with this exact shape:
   {{"relevance": 0, "why": "1-2 sentences tied to the question/seeds", "quote": "one verbatim sentence from the abstract that supports it, or empty", "related_seeds": ["S1"]}}
   Relevance must be an integer from 0 to 10. The quote must be copied verbatim from the abstract. Use only seed labels shown below.
+  Write "why" for a busy clinician in plain words. In "why", never write seed labels like S1 or S2; name the seed trial or topic instead.
 
   Research question:
   {question}

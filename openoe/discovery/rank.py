@@ -52,6 +52,14 @@ def parse_judge_json(text: str) -> Dict[str, Any]:
     return result
 
 
+_SEED_LABEL_RE = re.compile(r"\b(?:the )?(?:seed (?:paper )?)?S(\d+)\b", flags=re.I)
+
+
+def plain_seed_labels(text: str) -> str:
+    """Replace internal seed labels (S1, seed paper S2) with clinician-readable wording."""
+    return _SEED_LABEL_RE.sub(lambda m: f"your paper {m.group(1)}", text)
+
+
 def _normalize_quote(value: str) -> str:
     return re.sub(r"\s+", " ", value.lower().strip().strip("\"'“”‘’"))
 
@@ -231,7 +239,7 @@ async def rank_candidates(
                 )
                 parsed = parse_judge_json(response.content)
                 relevance = max(0, min(10, int(float(parsed.get("relevance", 0)))))
-                why = str(parsed.get("why") or "")
+                why = plain_seed_labels(str(parsed.get("why") or ""))
                 quote = str(parsed.get("quote") or "")
                 raw_related = parsed.get("related_seeds") or []
                 related = []
