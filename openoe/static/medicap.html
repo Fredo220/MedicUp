@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medicap</title>
+<style>
+:root{
+  --bg:#f6f7f9;--surface:#fff;--sunken:#f0f2f5;--border:#e1e4e8;--border-strong:#c9ced6;
+  --text:#16191d;--muted:#5f6772;--faint:#8b929c;
+  --accent:#2563eb;--accent-bg:#e8effd;
+  --ok:#15803d;--ok-bg:#e7f5ec;--warn:#b45309;--warn-bg:#fdf3e4;--err:#c62828;--err-bg:#fdecec;
+  --g:#2563eb;--s:#0d9488;--l:#7c3aed;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1014;--surface:#14181e;--sunken:#0f1317;--border:#262c35;--border-strong:#39414c;
+  --text:#e5e8ec;--muted:#9aa2ad;--faint:#6b737e;
+  --accent:#5b8cff;--accent-bg:#17233d;
+  --ok:#4ade80;--ok-bg:#12261a;--warn:#f0b35a;--warn-bg:#2b2112;--err:#f87171;--err-bg:#2c1515;
+  --g:#5b8cff;--s:#2dd4bf;--l:#a78bfa;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1014;--surface:#14181e;--sunken:#0f1317;--border:#262c35;--border-strong:#39414c;
+  --text:#e5e8ec;--muted:#9aa2ad;--faint:#6b737e;
+  --accent:#5b8cff;--accent-bg:#17233d;
+  --ok:#4ade80;--ok-bg:#12261a;--warn:#f0b35a;--warn-bg:#2b2112;--err:#f87171;--err-bg:#2c1515;
+  --g:#5b8cff;--s:#2dd4bf;--l:#a78bfa;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body{font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.mono{font-family:var(--mono);font-size:12px}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.top-in{display:flex;align-items:center;gap:16px;padding:0 16px;height:48px;overflow-x:auto;scrollbar-width:none}
+.brand{font-weight:600;font-size:14px;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.brand svg{width:16px;height:16px;color:var(--accent)}
+.runid{white-space:nowrap}
+.stages{display:flex;gap:4px;margin-left:auto}
+.stg{display:flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.stg i{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.stg.ok i{background:var(--ok)}.stg.warn i{background:var(--warn)}.stg.run i{background:var(--accent);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.iconbtn{border:1px solid var(--border);background:var(--surface);border-radius:4px;height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.iconbtn:hover{border-color:var(--border-strong)}
+
+/* query */
+.query{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) auto;gap:12px;align-items:start}
+@media(max-width:900px){.query{grid-template-columns:minmax(0,1fr)}}
+.query label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.query label span{text-transform:none;letter-spacing:0}
+.query input,.query textarea{width:100%;border:1px solid var(--border);border-radius:4px;background:var(--sunken);padding:7px 10px;font-size:12.5px}
+.query input{height:36px}
+.query textarea{resize:vertical;min-height:60px;font-family:var(--mono);line-height:1.6}
+.query input:focus,.query textarea:focus{border-color:var(--accent);outline:none}
+.hint{font-size:11.5px;color:var(--faint);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px}
+.qact{padding-top:19px}
+@media(max-width:900px){.qact{padding-top:0}}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn{height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.btn kbd{font-family:var(--mono);font-size:10px;opacity:.75;border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 4px}
+.demo{grid-column:1/-1;font-size:11px;color:var(--warn)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 140px)}
+@media(max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.side{border-right:1px solid var(--border);background:var(--surface);min-width:0}
+@media(max-width:900px){.side{border-right:0;border-bottom:1px solid var(--border)}}
+.sec{border-bottom:1px solid var(--border);padding:12px 16px}
+.sec h3{margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.sec h3 span{font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--mono)}
+.seedrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;padding:5px 0;border-top:1px solid var(--border);align-items:start}
+.seedrow:first-of-type{border-top:0}
+.seedrow b{font-weight:500;display:block;line-height:1.35}
+.seedrow small{color:var(--muted);font-size:11px}
+.seedrow.hl{background:var(--accent-bg);margin:0 -16px;padding-inline:16px}
+.seedrow code{font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere;display:block}
+.seedrow .acts{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.pick{border:1px solid var(--border);background:var(--surface);border-radius:4px;padding:3px 7px;text-align:left;font-size:11.5px;line-height:1.35}
+.pick:hover{border-color:var(--accent);color:var(--accent)}
+.pick .faint{font-family:var(--mono);font-size:10.5px}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-size:11.5px;align-self:flex-start}
+.alert[hidden]{display:none}
+.badge{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:3px;font-family:var(--mono);font-size:10.5px;border:1px solid var(--border);color:var(--muted);background:var(--sunken);white-space:nowrap}
+.badge.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.badge.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.badge.err{color:var(--err);background:var(--err-bg);border-color:transparent}
+.badge.acc{color:var(--accent);background:var(--accent-bg);border-color:transparent}
+.badge.g{color:var(--g)}.badge.s{color:var(--s)}.badge.l{color:var(--l)}
+.alert{border:1px solid var(--warn);background:var(--warn-bg);color:var(--text);border-radius:4px;padding:6px 8px;font-size:12px;margin-bottom:8px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:12px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;display:flex;flex-wrap:wrap;gap:4px}
+.hist{display:flex;align-items:flex-end;gap:2px;height:32px}
+.hist span{flex:1;background:var(--border-strong);border-radius:1px}
+.wt{display:grid;grid-template-columns:72px minmax(0,1fr) 36px;gap:8px;align-items:center;font-size:12px;margin-bottom:6px}
+.wt input{width:100%;accent-color:var(--accent)}
+.wt i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+/* main */
+.main{min-width:0;padding:0 16px 32px}
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:48px;background:var(--bg);z-index:10}
+.tab{border:0;background:none;padding:10px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+.tab .count{font-family:var(--mono);font-size:10.5px;background:var(--sunken);border:1px solid var(--border);border-radius:3px;padding:0 5px;color:var(--muted)}
+.panel{padding-top:12px}.panel[hidden]{display:none}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.toolbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.chk{height:26px;padding:0 9px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.chk[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.toolbar .right{margin-left:auto}
+.diff{display:none;align-items:center;gap:10px;border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--surface);border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:12px}
+.diff.show{display:flex}
+.diff button{margin-left:auto;border:0;background:none;color:var(--accent)}
+
+/* table */
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--sunken);white-space:nowrap;position:relative}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child>td{border-bottom:0}
+.res{min-width:880px}
+.res tr.row:hover>td{background:var(--sunken)}
+.res tr.row.acc>td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+.res tr.row.rej{opacity:.45}
+.res tr.row.flag>td:first-child{box-shadow:inset 3px 0 0 var(--err)}
+.res .t{font-weight:500;line-height:1.35}
+.res .au{color:var(--muted);font-size:12px}
+.delta.up{color:var(--ok)}.delta.down{color:var(--err)}
+.sbar{display:flex;height:6px;width:110px;border-radius:2px;overflow:hidden;background:var(--sunken);margin-top:5px}
+.sbar span{height:100%}
+.chev{border:0;background:none;color:var(--muted);width:22px;height:22px;border-radius:3px;display:inline-grid;place-items:center}
+.chev:hover{background:var(--sunken);color:var(--text)}
+.chev svg{width:14px;height:14px;transition:transform .15s}
+.chev[aria-expanded="true"] svg{transform:rotate(90deg)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--surface);height:24px;padding:0 8px;font-size:11.5px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on.a{background:var(--ok-bg);color:var(--ok)}
+.seg button.on.r{background:var(--err-bg);color:var(--err)}
+tr.detail>td{background:var(--sunken);padding:0}
+.det{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;padding:12px 14px 14px 48px}
+@media(max-width:1100px){.det{grid-template-columns:minmax(0,1fr);padding-left:14px}}
+.det h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.det p{margin:0 0 10px;max-width:72ch}
+.det q{font-style:italic}
+.sref{color:var(--accent);border-bottom:1px dotted var(--accent);cursor:help;font-family:var(--mono);font-size:12px}
+.comp{width:100%;font-size:12px;margin-bottom:10px}
+.comp td,.comp th{padding:4px 8px;background:none}
+.comp td:not(:first-child),.comp th:not(:first-child){text-align:right}
+pre.trace{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px;font:11.5px/1.55 var(--mono);overflow:auto;max-height:280px;white-space:pre}
+.tk{color:var(--l)}.ts{color:var(--s)}.tn{color:var(--g)}.tc{color:var(--faint)}
+
+/* graph */
+.card{border:1px solid var(--border);border-radius:6px;background:var(--surface);position:relative;overflow:hidden}
+.card-h{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.card-h i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+#graph{display:block;width:100%;height:auto}
+#graph line{stroke:var(--border-strong);stroke-width:1}
+#graph line.hot{stroke:var(--accent);stroke-width:1.5}
+#graph text{font:10px var(--mono);fill:var(--muted)}
+.gtip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:4px;max-width:280px;opacity:0;transition:opacity .12s}
+
+/* clusters */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.cl .card-h{justify-content:space-between;color:var(--text);font-weight:500}
+.cl ol{list-style:none;margin:0;padding:0}
+.cl li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.cl li:last-child{border-bottom:0}
+.cl.rej{opacity:.45}
+.tl{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;align-items:end;height:110px;padding:12px 12px 0}
+.tl div{display:flex;flex-direction:column-reverse;gap:2px}
+.tl span{height:12px;border-radius:2px;background:var(--accent)}
+.tl span.sd{background:var(--text)}
+.tlx{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;padding:4px 12px 10px;text-align:center;font:10.5px var(--mono);color:var(--faint)}
+
+/* eval */
+.evgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media(max-width:1000px){.evgrid{grid-template-columns:minmax(0,1fr)}}
+.bars{padding:12px}
+.brow{display:grid;grid-template-columns:80px minmax(0,1fr) 48px;gap:10px;align-items:center;margin-bottom:8px;font-size:12px}
+.brow .tr{height:16px;background:var(--sunken);border-radius:2px;overflow:hidden}
+.brow .fill{height:100%;background:var(--border-strong);transition:width .4s}
+.brow.hyb .fill{background:var(--accent)}
+.brow.hyb b{color:var(--accent)}
+.brow b{text-align:right;font-family:var(--mono);font-weight:500}
+.note{border-top:1px solid var(--border);padding:10px 12px;font-size:12px;color:var(--muted)}
+.loo td,.loo th{text-align:right;font-family:var(--mono);font-size:12px}
+.loo td:first-child,.loo th:first-child{text-align:left;font-family:var(--sans)}
+.loo td.hit{color:var(--ok)}.loo td.miss{color:var(--faint)}
+
+/* export */
+.exgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px}
+@media(max-width:900px){.exgrid{grid-template-columns:minmax(0,1fr)}}
+.exgrid ol{margin:0;padding:10px 12px 10px 32px;font-size:12.5px}
+.exgrid li{padding:3px 0}
+.exgrid pre{margin:0;padding:12px;font:11.5px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:460px;overflow:auto}
+.empty{padding:14px 12px;color:var(--muted)}
+
+footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);color:var(--faint);font:11px var(--mono)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Medicap</div>
+    <span class="runid mono faint">run 7f3a9c · cache hit</span>
+    <nav class="stages" id="stages" aria-label="Pipeline stages"></nav>
+    <button class="iconbtn" id="theme" type="button" aria-label="Toggle theme"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+</header>
+
+<section class="query">
+  <div class="qf">
+    <label for="qInput">Research question</label>
+    <input id="qInput" type="text" value="What mechanisms make CAR-T therapy fail in solid tumors?" autocomplete="off">
+    <div class="hint">Used for keyword sub-queries and by the LLM judge.</div>
+  </div>
+  <div class="qf">
+    <label for="seedInput">Seeds <span class="faint">· papers you already trust · one per line</span></label>
+    <textarea id="seedInput" rows="6" spellcheck="false" placeholder="10.1016/j.ymthe.2019.03.012&#10;PMID: 31234567&#10;CAR-T persistence in mesothelin-positive tumors"></textarea>
+    <div class="hint" id="seedHint"></div>
+  </div>
+  <div class="qact">
+    <button class="btn" id="runBtn" type="button">Run discovery <kbd>⌘↵</kbd></button>
+    <div class="hint" id="runHint"></div>
+  </div>
+  <div class="demo">Prototype: the catalog and results are made up for illustration and are not real records. Results don't change with the seeds yet.</div>
+</section>
+
+<div class="layout">
+  <aside class="side">
+    <section class="sec">
+      <h3>Seeds <span id="seedCount"></span></h3>
+      <div class="alert" id="seedNotice" hidden></div>
+      <div id="seeds"></div>
+    </section>
+    <section class="sec">
+      <h3>Seed profile <span>openalex · europe pmc</span></h3>
+      <dl class="kv">
+        <dt>Years</dt><dd><span class="num">2014–2024</span></dd>
+        <dt></dt><dd style="display:block"><div class="hist" id="hist"></div></dd>
+        <dt>Concepts</dt><dd><span class="badge acc">T-cell exhaustion</span><span class="badge acc">TME</span><span class="badge">antigen heterogeneity</span><span class="badge">TGF-β</span><span class="badge">trafficking</span></dd>
+        <dt>Sub-queries</dt><dd><span class="badge">"CAR-T" AND "immunosuppressive TME"</span><span class="badge">MeSH: Receptors, Chimeric Antigen</span><span class="badge">antigen escape solid tumor</span></dd>
+      </dl>
+    </section>
+    <section class="sec">
+      <h3>Score weights <span>re-ranks from cache</span></h3>
+      <label class="wt"><span><i style="background:var(--g)"></i>Graph</span><input type="range" id="wG" min="0" max="100" value="40"><span class="num" id="wGv"></span></label>
+      <label class="wt"><span><i style="background:var(--s)"></i>Semantic</span><input type="range" id="wS" min="0" max="100" value="35"><span class="num" id="wSv"></span></label>
+      <label class="wt"><span><i style="background:var(--l)"></i>LLM judge</span><input type="range" id="wL" min="0" max="100" value="25"><span class="num" id="wLv"></span></label>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="ranked">Ranked <span class="count" id="nRanked"></span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="graph">Citation graph</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="clusters">Clusters <span class="count">4</span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="eval">Evaluation</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="export">Reading list <span class="count" id="nAcc">0</span></button>
+    </div>
+
+    <div class="panel" id="p-ranked">
+      <div class="toolbar" id="filters">
+        <button class="chk" data-f="peer" aria-pressed="false">Peer-reviewed</button>
+        <button class="chk" data-f="recent" aria-pressed="false">≥ 2022</button>
+        <button class="chk" data-f="oa" aria-pressed="false">Open access</button>
+        <span class="sep"></span>
+        <span class="faint" style="font-size:12px">source:</span>
+        <button class="chk" data-c="graph" aria-pressed="false">graph</button>
+        <button class="chk" data-c="semantic" aria-pressed="false">semantic</button>
+        <button class="chk" data-c="keyword" aria-pressed="false">keyword</button>
+        <button class="chk" data-c="web" aria-pressed="false">web</button>
+        <span class="right mono faint" id="shown"></span>
+      </div>
+      <div class="diff" id="diff" role="status"><span class="mono" style="color:var(--accent)">re-ranked</span><span id="diffText"></span><button id="undo" type="button">Undo</button></div>
+      <div class="tw"><table class="res"><thead><tr>
+        <th style="width:32px"></th><th style="width:44px">#</th><th style="width:44px">Δ</th><th>Paper</th><th style="width:60px">Year</th><th style="width:110px">Type</th><th style="width:150px">Found via</th><th style="width:130px">Score</th><th style="width:140px">Decision</th>
+      </tr></thead><tbody id="rows"></tbody></table></div>
+    </div>
+
+    <div class="panel" id="p-graph" hidden>
+      <div class="card">
+        <div class="card-h"><span><i style="background:var(--text)"></i>seed</span><span><i style="background:var(--accent)"></i>candidate</span><span><i style="background:var(--err)"></i>flagged</span><span>radius = score · edges = openalex referenced_works</span></div>
+        <svg id="graph" viewBox="0 0 900 520" role="img" aria-label="Citation graph of seeds and candidates"></svg>
+        <div class="gtip" id="gtip"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-clusters" hidden>
+      <div class="cgrid" id="clusters"></div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-h"><span style="color:var(--text);font-weight:500">Publication years</span><span><i style="background:var(--text);border-radius:2px"></i>seeds</span><span><i style="background:var(--accent);border-radius:2px"></i>candidates</span></div>
+        <div class="tl" id="tl"></div><div class="tlx" id="tlx"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-eval" hidden>
+      <div class="evgrid">
+        <div class="card">
+          <div class="card-h" style="justify-content:space-between"><span style="color:var(--text);font-weight:500">Leave-one-out recall · 8 seeds · 312 candidates</span>
+            <div class="seg" id="kpick"><button data-k="5">@5</button><button data-k="10" class="on a">@10</button><button data-k="20">@20</button></div></div>
+          <div class="bars" id="bars"></div>
+          <div class="note">Method: hide one seed, run the pipeline on the other seven, record where the hidden seed ranks. Every channel is scored separately, so keyword search is a real baseline. At this k, hybrid recovers <b class="num" id="mult" style="color:var(--accent)"></b> as many seeds as keyword. Seed 6 is missed by every channel because no source has an abstract for it.</div>
+        </div>
+        <div class="card"><div class="card-h"><span style="color:var(--text);font-weight:500">Rank of hidden seed per channel</span><span>— = not in top 50</span></div>
+          <div style="overflow-x:auto"><table class="loo" id="loo"></table></div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-export" hidden>
+      <div class="exgrid">
+        <div class="card"><div class="card-h"><span style="color:var(--text);font-weight:500">Accepted</span><span class="mono" id="expCount"></span></div><div id="expList"></div></div>
+        <div class="card">
+          <div class="card-h" style="justify-content:space-between">
+            <div class="seg" id="fmt"><button data-fmt="md" class="on a">Markdown</button><button data-fmt="bib">BibTeX</button><button data-fmt="ris">RIS</button></div>
+            <button class="iconbtn" id="copyBtn" type="button">Copy</button></div>
+          <pre id="expOut"></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<footer><span>Each result links back to the seeds and sources that produced it</span><span>backend: nebius serverless · models: token factory · web: tavily</span></footer>
+
+<script>
+/* Mock lookup index standing in for openalex / crossref / pubmed. */
+const CATALOG=[
+ {id:1,t:"CAR-T persistence in mesothelin-positive tumors",v:"Mol Ther",y:2019,doi:"10.0000/seed.1",pmid:"30110001"},
+ {id:2,t:"Antigen escape after CD19 CAR-T: lessons for solid tumors",v:"Nat Rev Clin Oncol",y:2018,doi:"10.0000/seed.2",pmid:"29870002"},
+ {id:3,t:"Exhaustion programs in tumor-infiltrating CAR-T cells",v:"Immunity",y:2021,doi:"10.0000/seed.3",pmid:"33450003"},
+ {id:4,t:"Chemokine receptor mismatch limits T-cell trafficking",v:"Cancer Res",y:2016,doi:"10.0000/seed.4",pmid:"27010004"},
+ {id:5,t:"PD-1 blockade partially rescues exhausted CAR-T cells",v:"J Immunother Cancer",y:2022,doi:"10.0000/seed.5",pmid:"35550005"},
+ {id:6,t:"GD2 CAR-T in pediatric sarcoma: a pilot report",v:"Clin Cancer Res",y:2014,doi:"10.0000/seed.6",pmid:"24600006"},
+ {id:7,t:"Hypoxia and metabolic stress in solid-tumor immunotherapy",v:"Cell Metab",y:2023,doi:"10.0000/seed.7",pmid:"36900007"},
+ {id:8,t:"Armored CAR-T secreting IL-12 in ovarian models",v:"Sci Transl Med",y:2024,doi:"10.0000/seed.8",pmid:"38200008"},
+ {id:9,t:"CAR-T persistence and relapse in mesothelin-positive tumors: phase I update",v:"J Clin Oncol",y:2021,doi:"10.0000/seed.9",pmid:"33990009"},
+ {id:10,t:"Mesothelin-targeted CAR-T persistence in pleural mesothelioma",v:"Cancer Discov",y:2020,doi:"10.0000/seed.10",pmid:"32010010"}
+];
+const DEFAULT_SEEDS=["CAR-T persistence mesothelin tumors","10.0000/seed.2","PMID: 33450003","Chemokine receptor mismatch limits T-cell trafficking","10.0000/seed.5","https://doi.org/10.0000/seed.6","PMID 36900007","Armored CAR-T secreting IL-12 in ovarian models","Smith et al 2020 car t review","10.9999/broken.doi.2017"].join("\n");
+let SEEDS=[],ENTRIES=[];
+const CL={tme:"TME suppression",exh:"Exhaustion & rescue",ag:"Antigen escape",dx:"Biomarkers & trafficking"};
+const P=[
+ {id:"a",t:"Tumor microenvironment suppression drives functional decline of CAR-T cells in solid tumors",au:"Okafor N, Lindqvist M, Tan R",y:2024,v:"Nature Cancer",type:"Review",peer:1,oa:1,cit:214,cl:"tme",g:.92,s:.88,l:.90,ch:["graph","semantic","web"],sl:[3,5,7,1,8],doi:"10.0000/demo.a",
+  why:'Extends <span class="sref" data-s="3">S3</span> and <span class="sref" data-s="5">S5</span>, which document exhaustion but not its cause. Argues the TME drives it: <q>TGF-β and adenosine signalling account for most of the loss in cytotoxic function</q>.',web:["2025 review cites it as a key reference","phase I armored CAR-T trial registry entry"]},
+ {id:"b",t:"Dominant-negative TGF-β receptor restores CAR-T cytotoxicity in prostate models",au:"Haddad S, Wright J",y:2023,v:"Cancer Immunol Res",type:"In vivo",peer:1,oa:0,cit:88,cl:"tme",g:.71,s:.84,l:.86,ch:["graph","semantic"],sl:[3,8],doi:"10.0000/demo.b",
+  why:'Tests the TGF-β mechanism that <span class="sref" data-s="8">S8</span> works around with IL-12, by knocking out the receptor instead: <q>cytotoxicity recovered to 74% of baseline</q>.',web:[]},
+ {id:"c",t:"Single-cell atlas of CAR-T exhaustion trajectories across five solid tumor types",au:"Moreau C, Ito K, Banda P, Ruiz L",y:2024,v:"Cell",type:"Observational",peer:1,oa:1,cit:132,cl:"exh",g:.80,s:.90,l:.82,ch:["semantic","keyword"],sl:[3,5],doi:"10.0000/demo.c",
+  why:'Profiles the exhaustion programs from <span class="sref" data-s="3">S3</span> at single-cell resolution across five tumor types; gives the marker set S5\'s PD-1 rescue targets.',web:[]},
+ {id:"d",t:"Antigen loss variants emerge within 30 days of mesothelin CAR-T infusion",au:"Varga E, Chen L",y:2022,v:"Clin Cancer Res",type:"Clinical",peer:1,oa:1,cit:61,cl:"ag",g:.84,s:.69,l:.80,ch:["graph","keyword"],sl:[1,2],doi:"10.0000/demo.d",
+  why:'Bridges <span class="sref" data-s="1">S1</span> (mesothelin) and <span class="sref" data-s="2">S2</span> (antigen escape) with patient data: <q>mesothelin-low clones dominated by day 30 in 6 of 11 patients</q>.',web:["discussed in a 2024 ASCO session summary"]},
+ {id:"e",t:"Dual-targeting CAR designs reduce escape in heterogeneous solid tumors",au:"Nakamura T, Osei A",y:2023,v:"Mol Ther",type:"In vivo",peer:1,oa:0,cit:47,cl:"ag",g:.62,s:.81,l:.77,ch:["semantic"],sl:[2],doi:"10.0000/demo.e",
+  why:'Proposes the fix to the escape problem in <span class="sref" data-s="2">S2</span>; same lab lineage as S1 by co-citation.',web:[]},
+ {id:"f",t:"CXCR2-engineered CAR-T cells improve infiltration of hepatocellular carcinoma",au:"Li W, Brennan K",y:2021,v:"J Hepatol",type:"In vivo",peer:1,oa:1,cit:73,cl:"dx",g:.77,s:.70,l:.71,ch:["graph"],sl:[4],doi:"10.0000/demo.f",
+  why:'Directly addresses the chemokine mismatch in <span class="sref" data-s="4">S4</span> by engineering the receptor.',web:[]},
+ {id:"g",t:"Lactate accumulation blunts CAR-T metabolism in hypoxic tumor cores",au:"Fischer M, Adeyemi O",y:2024,v:"bioRxiv",type:"Preprint",peer:0,oa:1,cit:9,cl:"tme",g:.41,s:.86,l:.79,ch:["semantic","web"],sl:[7],doi:"10.0000/demo.g",
+  why:'Not peer-reviewed. Adds a lactate mechanism to the hypoxia story in <span class="sref" data-s="7">S7</span>.',web:["preprint discussed in a 2025 journal club blog"]},
+ {id:"h",t:"Circulating CAR-T phenotype predicts response in solid tumors: a pooled analysis",au:"Duarte F, Kim H, Mensah R",y:2023,v:"J Clin Oncol",type:"Meta-analysis",peer:1,oa:0,cit:102,cl:"dx",g:.58,s:.72,l:.84,ch:["keyword","semantic"],sl:[1,5],doi:"10.0000/demo.h",
+  why:'Pools outcome data across trials; links persistence (<span class="sref" data-s="1">S1</span>) to response.',web:[]},
+ {id:"i",t:"Checkpoint knockout CAR-T persists longer but shows off-tumor toxicity",au:"Rossi G, Patel D",y:2022,v:"Blood Adv",type:"Clinical",peer:1,oa:1,cit:55,cl:"exh",g:.69,s:.66,l:.62,ch:["graph"],sl:[5],doi:"10.0000/demo.i",
+  why:'Counterpoint to <span class="sref" data-s="5">S5</span>: genetic PD-1 knockout instead of blockade, with a safety signal.',web:[]},
+ {id:"j",t:"IL-12 armored CAR-T efficacy in ovarian cancer (retracted)",au:"Grant P",y:2020,v:"Oncotarget",type:"In vivo",peer:1,oa:1,cit:40,cl:"tme",g:.88,s:.83,l:.30,ch:["graph","keyword"],sl:[8],doi:"10.0000/demo.j",flag:"retracted",
+  why:'High graph and semantic overlap with <span class="sref" data-s="8">S8</span>, but Retraction Watch lists it as retracted (2023, image duplication). The judge scores it low and it is flagged.',web:["retraction notice, 2023"]},
+ {id:"k",t:"Trafficking defects explain poor CAR-T responses in glioblastoma",au:"Søndergaard L, Mwangi J",y:2020,v:"Neuro Oncol",type:"Observational",peer:1,oa:0,cit:66,cl:"dx",g:.54,s:.61,l:.66,ch:["keyword"],sl:[4],doi:"10.0000/demo.k",
+  why:'Extends <span class="sref" data-s="4">S4</span> to the CNS where trafficking is the main barrier.',web:[]}
+];
+const CH_TAG={graph:"g",semantic:"s",keyword:"",web:""};
+const st={dec:{},open:new Set(),f:new Set(),c:new Set(),w:{g:40,s:35,l:25},prevW:null,prevOrder:null,k:10,fmt:"md",tab:"ranked"};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function score(p,w=st.w){const t=w.g+w.s+w.l||1;return (w.g*p.g+w.s*p.s+w.l*p.l)/t}
+function pct(v){return Math.max(1,Math.min(100,Math.round(v*100)))+"%"}
+function ranked(w){return [...P].sort((a,b)=>score(b,w)-score(a,w)).map(p=>p.id)}
+let base=ranked();
+
+/* stages */
+const STAGES=[["resolve","ok",""],["expand","ok","312"],["embed","ok","bge-m3"],["judge","ok","48"],["rank","ok",""]];
+function renderStages(){$("#stages").innerHTML=STAGES.map(([n,s,m])=>`<span class="stg ${s}"><i></i>${n}${m?` <span class="faint">${m}</span>`:""}</span>`).join("")}
+
+/* seeds: parse + resolve each line of the seeds box */
+const STOP=new Set("a an and the of in on for to with after from by at is".split(" "));
+const toks=s=>s.toLowerCase().split(/[^a-z0-9]+/).filter(w=>w&&!STOP.has(w));
+const norm=s=>toks(s).join(" ");
+function dice(a,b){const A=new Set(toks(a)),B=new Set(toks(b));let n=0;A.forEach(w=>B.has(w)&&n++);return A.size+B.size?2*n/(A.size+B.size):0}
+const RX_DOI=/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)$/i,RX_PMID=/^(?:pmid:?\s*)?(\d{6,9})$/i;
+function resolveLine(raw){
+  let m;
+  if(m=raw.match(RX_DOI)){const d=m[1].toLowerCase(),p=CATALOG.find(c=>c.doi===d);return p?{kind:"doi",st:"ok",p}:{kind:"doi",st:"miss",msg:"doi.org has no record for this DOI"}}
+  if(m=raw.match(RX_PMID)){const p=CATALOG.find(c=>c.pmid===m[1]);return p?{kind:"pmid",st:"ok",p}:{kind:"pmid",st:"miss",msg:"PubMed has no record for this PMID"}}
+  const exact=CATALOG.find(c=>norm(c.t)===norm(raw));if(exact)return {kind:"title",st:"ok",p:exact};
+  const cands=CATALOG.map(c=>({c,s:dice(raw,c.t)})).filter(x=>x.s>=.5).sort((a,b)=>b.s-a.s).slice(0,3);
+  if(cands.length===1)return {kind:"title",st:"ok",p:cands[0].c,fuzzy:cands[0].s};
+  if(cands.length>1)return {kind:"title",st:"amb",cands};
+  return {kind:"title",st:"miss",msg:"no title match in openalex, crossref or pubmed"};
+}
+function parseSeeds(){
+  const lines=$("#seedInput").value.split("\n"),seen={};
+  ENTRIES=[];
+  lines.forEach((l,i)=>{const raw=l.trim();if(!raw)return;
+    const r={line:i,raw,...resolveLine(raw)};
+    if(r.st==="ok"){if(seen[r.p.id]!==undefined){r.st="dup";r.dupOf=seen[r.p.id]}else seen[r.p.id]=i}
+    ENTRIES.push(r)});
+  SEEDS=ENTRIES.filter(e=>e.st==="ok").map(e=>({id:e.p.id,t:e.p.t,m:`${e.p.y} · ${e.p.v}`,y:e.p.y,ok:1}));
+  renderSeeds();
+}
+function renderSeeds(){
+  const n=ENTRIES.length,ok=SEEDS.length,c=k=>ENTRIES.filter(e=>e.st===k).length,amb=c("amb"),miss=c("miss"),dup=c("dup");
+  const kinds=["doi","pmid","title"].map(k=>[k,ENTRIES.filter(e=>e.kind===k).length]).filter(x=>x[1]);
+  $("#seedHint").innerHTML=n?`<span>${n} line${n===1?"":"s"}</span>${kinds.map(([k,v])=>`<span>${v} ${k==="pmid"?"PMID":k==="doi"?"DOI":"title"}</span>`).join("")}`:"<span>DOI, doi.org link, PMID or exact title</span>";
+  $("#seedCount").textContent=`${ok}/${n} resolved`;
+  const issues=[miss&&`${miss} not found`,amb&&`${amb} need${amb===1?"s":""} a choice`,dup&&`${dup} duplicate${dup===1?"":"s"}`].filter(Boolean);
+  $("#seedNotice").hidden=!issues.length;
+  $("#seedNotice").innerHTML=`<b>${issues.join(", ")}.</b> Unresolved lines are skipped when you run.`;
+  $("#seeds").innerHTML=ENTRIES.map(e=>{
+    const L=`<span class="mono faint">L${e.line+1}</span>`;
+    if(e.st==="ok")return `<div class="seedrow" data-seed="${e.p.id}"><span class="mono faint">S${e.p.id}</span><div><b>${esc(e.p.t)}</b><small>${e.p.y} · ${esc(e.p.v)} · via ${e.kind}${e.fuzzy?` <span class="badge warn">fuzzy ${pct(e.fuzzy)}</span>`:""}</small></div><span class="badge ok">ok</span></div>`;
+    if(e.st==="amb")return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>${e.cands.length} close matches. Pick one:</small><div class="acts">${e.cands.map(x=>`<button class="pick" data-line="${e.line}" data-doi="${x.c.doi}">${esc(x.c.t)} <span class="faint">${x.c.y} · ${pct(x.s)}</span></button>`).join("")}<button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge warn">ambiguous</span></div>`;
+    if(e.st==="dup")return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>Same paper as line ${e.dupOf+1} (S${e.p.id})</small><div class="acts"><button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge">duplicate</span></div>`;
+    return `<div class="seedrow">${L}<div><code>${esc(e.raw)}</code><small>${e.msg}</small><div class="acts"><button class="linkbtn" data-rm="${e.line}">Remove line</button></div></div><span class="badge err">not found</span></div>`;
+  }).join("")||'<div class="empty" style="padding:4px 0">No seeds yet. Add at least 3 papers you trust.</div>';
+  const yrs=[];for(let y=2014;y<=2024;y++)yrs.push(y);
+  $("#hist").innerHTML=yrs.map(y=>{const k=SEEDS.filter(s=>s.y===y).length;return `<span title="${y}: ${k}" style="height:${k?40+k*60:8}%;${k?"background:var(--accent)":""}"></span>`}).join("");
+  STAGES[0]=["resolve",ok===n?"ok":"warn",`${ok}/${n}`];renderStages();
+  $("#runBtn").disabled=!ok;
+  $("#runHint").textContent=!ok?"Add at least one resolvable seed":ok<3?"Fewer than 3 seeds gives weak results":"";
+}
+function editLine(i,txt){const ls=$("#seedInput").value.split("\n");txt===null?ls.splice(i,1):ls[i]=txt;$("#seedInput").value=ls.join("\n");parseSeeds();renderAll()}
+$("#seeds").addEventListener("click",e=>{
+  const p=e.target.closest(".pick");if(p)return editLine(+p.dataset.line,p.dataset.doi);
+  const r=e.target.closest("[data-rm]");if(r)editLine(+r.dataset.rm,null);
+});
+let seedTimer;
+$("#seedInput").addEventListener("input",()=>{clearTimeout(seedTimer);seedTimer=setTimeout(()=>{parseSeeds();renderAll()},250)});
+$("#seedInput").value=DEFAULT_SEEDS;
+
+/* weights */
+function syncW(){["g","s","l"].forEach(k=>{const t=st.w.g+st.w.s+st.w.l||1;$("#w"+k.toUpperCase()+"v").textContent=pct(st.w[k]/t)})}
+let wTimer;
+["g","s","l"].forEach(k=>$("#w"+k.toUpperCase()).addEventListener("input",e=>{
+  if(!st.prevW){st.prevW={...st.w};st.prevOrder=ranked(st.w)}
+  st.w[k]=+e.target.value;syncW();renderRows();
+  clearTimeout(wTimer);wTimer=setTimeout(showDiff,250);
+}));
+function showDiff(){
+  const now=ranked(st.w),before=st.prevOrder;let moved=0,big=null;
+  now.forEach((id,i)=>{const d=before.indexOf(id)-i;if(d)moved++;if(!big||Math.abs(d)>Math.abs(big.d))big={id,d}});
+  if(!moved){$("#diff").classList.remove("show");return}
+  const p=P.find(x=>x.id===big.id);
+  $("#diffText").innerHTML=`${moved} rows moved. Largest: <b>${esc(p.t.slice(0,60))}…</b> <span class="num ${big.d>0?"delta up":"delta down"}">${big.d>0?"▲":"▼"}${Math.abs(big.d)}</span>`;
+  $("#diff").classList.add("show");
+}
+$("#undo").onclick=()=>{if(!st.prevW)return;st.w={...st.prevW};["g","s","l"].forEach(k=>$("#w"+k.toUpperCase()).value=st.w[k]);st.prevW=null;syncW();renderRows();$("#diff").classList.remove("show")};
+
+/* ranked table */
+const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>';
+function visible(){
+  return ranked(st.w).map(id=>P.find(p=>p.id===id)).filter(p=>
+    (!st.f.has("peer")||p.peer)&&(!st.f.has("recent")||p.y>=2022)&&(!st.f.has("oa")||p.oa)&&
+    (!st.c.size||p.ch.some(c=>st.c.has(c))));
+}
+function trace(p){
+  const sc=score(p),t=st.w.g+st.w.s+st.w.l||1;
+  const L=[];
+  L.push(`<span class="tc"># provenance for candidate ${p.id}</span>`);
+  L.push(`<span class="tk">doi</span>: <span class="ts">"${p.doi}"</span>`);
+  L.push(`<span class="tk">source</span>: <span class="ts">openalex</span>  <span class="tc"># cited_by=${p.cit}</span>`);
+  L.push(`<span class="tk">channels</span>:`);
+  p.ch.forEach(c=>{
+    if(c==="graph")L.push(`  - graph: co-cited with [${p.sl.map(s=>"S"+s).join(", ")}]  <span class="tc">depth=1</span>`);
+    if(c==="semantic")L.push(`  - semantic: cos=<span class="tn">${p.s.toFixed(3)}</span> vs seed centroid  <span class="tc">bge-m3</span>`);
+    if(c==="keyword")L.push(`  - keyword: europe pmc, sub-query #${1+(p.id.charCodeAt(0)%3)}`);
+    if(c==="web")L.push(`  - web: tavily, ${p.web.length} hit${p.web.length===1?"":"s"}`);
+  });
+  p.web.forEach(w=>L.push(`      ↳ <span class="ts">"${esc(w)}"</span>`));
+  L.push(`<span class="tk">judge</span>: <span class="tn">${pct(p.l)}</span>  <span class="tc"># llm relevance, abstract + seed titles</span>`);
+  if(p.flag)L.push(`<span class="tk">flags</span>: [<span class="ts">"${p.flag}"</span>]  <span class="tc"># retraction watch</span>`);
+  L.push(`<span class="tk">score</span>: <span class="tn">${pct(sc)}</span> = ${pct(st.w.g/t)}·g + ${pct(st.w.s/t)}·s + ${pct(st.w.l/t)}·l`);
+  return L.join("\n");
+}
+function renderRows(){
+  const rows=visible(),order=ranked(st.w);
+  $("#nRanked").textContent=P.length;
+  $("#shown").textContent=`${rows.length} of ${P.length}`;
+  const t=st.w.g+st.w.s+st.w.l||1;
+  $("#rows").innerHTML=rows.map(p=>{
+    const r=order.indexOf(p.id)+1,d=base.indexOf(p.id)+1-r,dec=st.dec[p.id],open=st.open.has(p.id),sc=score(p);
+    const cls=["row",dec==="a"?"acc":"",dec==="r"?"rej":"",p.flag?"flag":""].join(" ");
+    const bar=`<div class="sbar"><span style="width:${st.w.g/t*p.g*100}%;background:var(--g)"></span><span style="width:${st.w.s/t*p.s*100}%;background:var(--s)"></span><span style="width:${st.w.l/t*p.l*100}%;background:var(--l)"></span></div>`;
+    let h=`<tr class="${cls}" data-id="${p.id}">
+      <td><button class="chev" aria-expanded="${open}" aria-label="Show details" data-x="${p.id}">${ICON}</button></td>
+      <td class="num">${r}</td>
+      <td class="num">${d?`<span class="delta ${d>0?"up":"down"}">${d>0?"▲":"▼"}${Math.abs(d)}</span>`:'<span class="faint">·</span>'}</td>
+      <td><div class="t">${esc(p.t)}</div><div class="au">${esc(p.au)} · ${esc(p.v)} · <span class="num">${p.cit}</span> cites${p.oa?' · <span class="badge ok">OA</span>':""}${p.flag?` <span class="badge err">${p.flag}</span>`:""}${!p.peer?' <span class="badge warn">preprint</span>':""}</div></td>
+      <td class="num">${p.y}</td>
+      <td><span class="badge">${p.type}</span></td>
+      <td>${p.ch.map(c=>`<span class="badge ${CH_TAG[c]}">${c}</span>`).join(" ")}</td>
+      <td><span class="num">${pct(sc)}</span>${bar}</td>
+      <td><div class="seg"><button class="${dec==="a"?"on a":""}" data-d="a" data-id="${p.id}">Accept</button><button class="${dec==="r"?"on r":""}" data-d="r" data-id="${p.id}">Reject</button></div></td>
+    </tr>`;
+    if(open)h+=`<tr class="detail"><td colspan="9"><div class="det">
+      <div><h4>Why it's here</h4><p>${p.why}</p>
+        <h4>Score components</h4>
+        <table class="comp"><thead><tr><th>Channel</th><th>Raw</th><th>Weight</th><th>Contribution</th></tr></thead><tbody>
+          ${[["graph","g"],["semantic","s"],["llm judge","l"]].map(([n,k])=>`<tr><td><span class="badge ${k}">${n}</span></td><td class="num">${pct(p[k])}</td><td class="num">${pct(st.w[k]/t)}</td><td class="num">${(st.w[k]/t*p[k]*100).toFixed(1)}%</td></tr>`).join("")}
+          <tr><td><b>total</b></td><td></td><td></td><td class="num"><b>${pct(sc)}</b></td></tr>
+        </tbody></table></div>
+      <div><h4>Trace</h4><pre class="trace">${trace(p)}</pre></div>
+    </div></td></tr>`;
+    return h;
+  }).join("")||`<tr><td colspan="9" class="empty">No rows match these filters.</td></tr>`;
+}
+$("#rows").addEventListener("click",e=>{
+  const x=e.target.closest("[data-x]");if(x){const id=x.dataset.x;st.open.has(id)?st.open.delete(id):st.open.add(id);renderRows();return}
+  const d=e.target.closest("[data-d]");if(d){const id=d.dataset.id;st.dec[id]=st.dec[id]===d.dataset.d?undefined:d.dataset.d;renderAll()}
+});
+$("#rows").addEventListener("mouseover",e=>{
+  const s=e.target.closest(".sref");$$(".seedrow").forEach(r=>r.classList.toggle("hl",!!s&&r.dataset.seed===s.dataset.s));
+});
+$("#filters").addEventListener("click",e=>{
+  const b=e.target.closest(".chk");if(!b)return;
+  const set=b.dataset.f?st.f:st.c,key=b.dataset.f||b.dataset.c;
+  set.has(key)?set.delete(key):set.add(key);b.setAttribute("aria-pressed",set.has(key));renderRows();
+});
+
+/* tabs */
+$$(".tab").forEach(t=>t.onclick=()=>{
+  $$(".tab").forEach(x=>x.setAttribute("aria-selected",x===t));
+  $$(".panel").forEach(p=>p.hidden=p.id!=="p-"+t.dataset.tab);
+  st.tab=t.dataset.tab;if(st.tab==="graph")renderGraph();
+});
+
+/* graph */
+function renderGraph(){
+  const W=900,H=520,cx=W/2,cy=H/2,svg=$("#graph");
+  const seeds=SEEDS.filter(s=>s.ok),pos={};
+  seeds.forEach((s,i)=>{const a=i/seeds.length*Math.PI*2-Math.PI/2;pos["S"+s.id]=[cx+Math.cos(a)*120,cy+Math.sin(a)*100]});
+  P.forEach((p,i)=>{const a=i/P.length*Math.PI*2-Math.PI/2+.2;pos[p.id]=[cx+Math.cos(a)*360,cy+Math.sin(a)*210]});
+  let h="";
+  P.forEach(p=>p.sl.forEach(s=>{if(!pos["S"+s])return;const[a,b]=pos[p.id],[c,d]=pos["S"+s];h+=`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" data-e="${p.id}"/>`}));
+  seeds.forEach(s=>{const[x,y]=pos["S"+s.id];h+=`<circle cx="${x}" cy="${y}" r="9" fill="var(--text)" data-s="${s.id}"/><text x="${x}" y="${y+22}" text-anchor="middle">S${s.id}</text>`});
+  P.forEach(p=>{const[x,y]=pos[p.id],r=5+score(p)*12,dec=st.dec[p.id];
+    h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${p.flag?"var(--err)":"var(--accent)"}" fill-opacity="${dec==="r"?.25:.85}" stroke="${dec==="a"?"var(--ok)":"none"}" stroke-width="3" data-p="${p.id}" style="cursor:pointer"/><text x="${x}" y="${y-r-4}" text-anchor="middle">${ranked(st.w).indexOf(p.id)+1}</text>`});
+  svg.innerHTML=h;
+}
+$("#graph").addEventListener("mousemove",e=>{
+  const c=e.target.closest("[data-p],[data-s]"),tip=$("#gtip");
+  $$("#graph line").forEach(l=>l.classList.toggle("hot",!!c&&c.dataset.p===l.dataset.e));
+  if(!c){tip.style.opacity=0;return}
+  const box=$("#graph").parentElement.getBoundingClientRect();
+  tip.textContent=c.dataset.p?(()=>{const p=P.find(x=>x.id===c.dataset.p);return `${p.t} · score ${pct(score(p))}`})():SEEDS.find(s=>s.id==c.dataset.s).t;
+  tip.style.left=Math.min(e.clientX-box.left+12,box.width-290)+"px";tip.style.top=(e.clientY-box.top+12)+"px";tip.style.opacity=1;
+});
+$("#graph").addEventListener("click",e=>{
+  const c=e.target.closest("[data-p]");if(!c)return;
+  st.open.add(c.dataset.p);$('.tab[data-tab="ranked"]').click();renderRows();
+  document.querySelector(`tr[data-id="${c.dataset.p}"]`)?.scrollIntoView({block:"center"});
+});
+
+/* clusters */
+function renderClusters(){
+  const order=ranked(st.w);
+  $("#clusters").innerHTML=Object.entries(CL).map(([k,n])=>{
+    const ps=order.map(id=>P.find(p=>p.id===id)).filter(p=>p.cl===k);
+    const allRej=ps.every(p=>st.dec[p.id]==="r");
+    return `<div class="card cl ${allRej?"rej":""}"><div class="card-h"><span>${n}</span><span class="mono faint">${ps.length} papers</span></div>
+      <ol>${ps.map(p=>`<li><span class="num faint">#${order.indexOf(p.id)+1}</span><span>${esc(p.t)}</span><span class="num muted">${pct(score(p))}</span></li>`).join("")}</ol>
+      <div style="padding:8px 12px;border-top:1px solid var(--border)"><div class="seg"><button data-ca="${k}">Accept all</button><button data-cr="${k}">Reject all</button></div></div></div>`;
+  }).join("");
+  const Y=[];for(let y=2014;y<=2025;y++)Y.push(y);
+  $("#tl").innerHTML=Y.map(y=>`<div title="${y}">${SEEDS.filter(s=>s.y===y).map(()=>'<span class="sd"></span>').join("")}${P.filter(p=>p.y===y).map(()=>"<span></span>").join("")}</div>`).join("");
+  $("#tlx").innerHTML=Y.map(y=>`<span>'${String(y).slice(2)}</span>`).join("");
+}
+$("#clusters").addEventListener("click",e=>{
+  const a=e.target.closest("[data-ca],[data-cr]");if(!a)return;
+  const k=a.dataset.ca||a.dataset.cr,v=a.dataset.ca?"a":"r";
+  P.filter(p=>p.cl===k).forEach(p=>st.dec[p.id]=v);renderAll();
+});
+
+/* eval */
+/* LOO rows: [seed, keyword, web, graph, semantic, hybrid] rank of the hidden seed; recall@k is derived from them. */
+const CH=["keyword","web","graph","semantic","hybrid"];
+const LOO=[[1,14,11,3,5,2],[2,7,6,4,9,1],[3,22,null,6,2,2],[4,9,4,2,18,3],[5,31,25,8,4,4],[6,null,null,null,null,null],[7,null,15,19,7,8],[8,12,9,5,3,3]];
+const recall=k=>Object.fromEntries(CH.map((c,i)=>[c,LOO.filter(r=>r[i+1]!=null&&r[i+1]<=k).length/LOO.length]));
+function renderEval(){
+  const r=recall(st.k);
+  $("#bars").innerHTML=CH.map(c=>`<div class="brow ${c==="hybrid"?"hyb":""}"><span>${c}</span><div class="tr"><div class="fill" style="width:${r[c]*100}%"></div></div><b>${Math.round(r[c]*100)}%</b></div>`).join("");
+  $("#mult").textContent=r.keyword?(r.hybrid/r.keyword).toFixed(1)+"×":"—";
+  $("#loo").innerHTML=`<thead><tr><th>Hidden seed</th><th>keyword</th><th>web</th><th>graph</th><th>semantic</th><th>hybrid</th></tr></thead><tbody>${LOO.map(([s,...rs])=>`<tr><td><span class="mono faint">S${s}</span> ${esc(CATALOG.find(c=>c.id===s).t.slice(0,38))}…</td>${rs.map(v=>`<td class="${v&&v<=st.k?"hit":"miss"}">${v??"—"}</td>`).join("")}</tr>`).join("")}</tbody>`;
+}
+$("#kpick").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.k=+b.dataset.k;$$("#kpick button").forEach(x=>x.className=x===b?"on a":"");renderEval()});
+
+/* export */
+function key(p){return p.au.split(" ")[0].toLowerCase()+p.y}
+function renderExport(){
+  const acc=ranked(st.w).map(id=>P.find(p=>p.id===id)).filter(p=>st.dec[p.id]==="a");
+  $("#nAcc").textContent=acc.length;$("#expCount").textContent=acc.length+" papers";
+  $("#expList").innerHTML=acc.length?`<ol>${acc.map(p=>`<li>${esc(p.t)} <span class="faint">(${p.y})</span></li>`).join("")}</ol>`:'<div class="empty">Accept rows in the Ranked tab to build the list.</div>';
+  let out="";
+  if(st.fmt==="md")out=`# Reading list: CAR-T failure in solid tumors\n\n`+acc.map((p,i)=>`${i+1}. ${p.au} (${p.y}). *${p.t}*. ${p.v}. https://doi.org/${p.doi}`).join("\n");
+  if(st.fmt==="bib")out=acc.map(p=>`@article{${key(p)},\n  title   = {${p.t}},\n  author  = {${p.au.replace(/, /g," and ")}},\n  journal = {${p.v}},\n  year    = {${p.y}},\n  doi     = {${p.doi}}\n}`).join("\n\n");
+  if(st.fmt==="ris")out=acc.map(p=>`TY  - JOUR\nTI  - ${p.t}\n${p.au.split(", ").map(a=>"AU  - "+a).join("\n")}\nJO  - ${p.v}\nPY  - ${p.y}\nDO  - ${p.doi}\nER  -`).join("\n\n");
+  $("#expOut").textContent=acc.length?out:"// nothing accepted yet";
+}
+$("#fmt").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st.fmt=b.dataset.fmt;$$("#fmt button").forEach(x=>x.className=x===b?"on a":"");renderExport()});
+$("#copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText($("#expOut").textContent);$("#copyBtn").textContent="Copied"}catch{$("#copyBtn").textContent="Copy failed"}setTimeout(()=>$("#copyBtn").textContent="Copy",1400)};
+
+/* run (simulated) */
+$("#runBtn").onclick=()=>{
+  const els=$$(".stg");els.forEach(s=>s.className="stg");let i=0;
+  const tick=()=>{if(i>0)els[i-1].className="stg "+STAGES[i-1][1];if(i<els.length){els[i].className="stg run";i++;setTimeout(tick,380)}};
+  tick();
+};
+["#qInput","#seedInput"].forEach(s=>$(s).addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();if(!$("#runBtn").disabled)$("#runBtn").click()}}));
+
+/* theme */
+$("#theme").onclick=()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=dark?"light":"dark";try{localStorage.setItem("pc-theme",r.dataset.theme)}catch{}};
+try{const t=localStorage.getItem("pc-theme");if(t)document.documentElement.dataset.theme=t}catch{}
+
+function renderAll(){renderRows();renderClusters();renderExport();if(st.tab==="graph")renderGraph()}
+syncW();parseSeeds();renderAll();renderEval();
+</script>
+</body>
+</html>

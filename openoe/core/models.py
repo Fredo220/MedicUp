@@ -30,6 +30,7 @@ class Document:
     score_type: Optional[str] = None
     relevance: Optional[bool] = None
     relevant_chunks: Optional[List[str]] = None
+    score_pct: Optional[int] = None          # 1–100, relative to the best doc in the run
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +67,9 @@ class QueryContext:
     filtered_papers: List[Document] = field(default_factory=list)
     filtered_guidelines: List[Document] = field(default_factory=list)
 
+    # Stage 4b — Web context (Tavily)
+    web_context: Dict[str, Any] = field(default_factory=dict)
+
     # Stage 5 — Answer
     answer: Optional[str] = None
     markdown: Optional[str] = None
@@ -94,3 +98,4 @@ class QueryResponse(BaseModel):
     stats: Dict[str, Any]
     trace_id: str
     timings: Dict[str, float]
+    web_context: Dict[str, Any] = Field(default_factory=dict)

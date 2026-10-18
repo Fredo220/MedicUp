@@ -13,6 +13,33 @@ retrieval:
       filters:
         date_range_years: 10
 
+    tavily_web:
+      enabled: true
+      source: tavily
+      mode: scholarly          # restrict to include_domains; any other mode = open web
+      limit: 10
+      config:
+        api_key: "${TAVILY_API_KEY:}"
+        search_depth: basic
+        include_domains:
+          - pubmed.ncbi.nlm.nih.gov
+          - pmc.ncbi.nlm.nih.gov
+          - europepmc.org
+          - doi.org
+          - nature.com
+          - cell.com
+          - sciencedirect.com
+          - thelancet.com
+          - nejm.org
+          - jamanetwork.com
+          - bmj.com
+          - academic.oup.com
+          - link.springer.com
+          - onlinelibrary.wiley.com
+          - frontiersin.org
+          - biorxiv.org
+          - medrxiv.org
+
 merge:
   papers:
     strategy: rrf
@@ -46,6 +73,17 @@ stages:
       model: openai/gpt-oss-20b
       provider: google-vertex
       concurrency: 20
+
+  web_context:                 # Tavily: background for the answer + supporting sources per cited paper
+    enabled: true
+    api_key: "${TAVILY_API_KEY:}"
+    search_depth: basic
+    max_results: 5
+    include_answer: true
+    feed_answer: true          # pass web sources to the answer model as low-priority context
+    supporting:
+      top_k: 5                 # cited papers to enrich
+      max_results: 3           # supporting sources per paper
 
   answer:
     model: openai/gpt-5.4

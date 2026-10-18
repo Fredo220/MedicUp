@@ -130,6 +130,14 @@ sup.cite:hover .cite-tooltip{opacity:1}
 .ref-badge.guideline{background:rgba(255,192,120,.15);color:var(--warn)}
 .ref-doi{font-size:.78rem;color:var(--text2)}
 .ref-year{font-size:.78rem;color:var(--muted)}
+.ref-badge.web{background:rgba(120,160,255,.15);color:#8fb0ff}
+.ref-score{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent)}
+.ref-via{font-size:.72rem;color:var(--muted)}
+.ref-support{margin-top:8px;padding-left:10px;border-left:2px solid var(--border);font-size:.78rem}
+.ref-support a{display:block;color:var(--text2);margin-top:3px}
+.ref-support .lbl{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+.web-ctx{margin-top:14px}
+.web-ctx .web-answer{font-size:.84rem;color:var(--text2);margin-bottom:8px}
 
 /* Stats bar — spans full width below the split */
 .qa-stats{margin-top:16px}
@@ -263,13 +271,33 @@ sup.cite:hover .cite-tooltip{opacity:1}
     runQuery(q);
   });
 
+  /* ── Score / web-source helpers ──────────────── */
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  }
+  function docType(c) {
+    return (c.doc_type === "guideline" || c.doc_type === "web") ? c.doc_type : "paper";
+  }
+  function scoreBadge(c) {
+    return (c.score_pct != null) ? `<span class="ref-score" title="Score (1–100%)">${c.score_pct}%</span>` : "";
+  }
+  function foundVia(c) {
+    return (c.found_via && c.found_via.length) ? `<span class="ref-via">via ${esc(c.found_via.join(" + "))}</span>` : "";
+  }
+  function webLinks(list, label) {
+    if (!list || !list.length) return "";
+    return `<div class="ref-support"><span class="lbl">${label}</span>` +
+      list.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)} <span class="ref-year">${esc(s.domain)} · ${s.score_pct}%</span></a>`).join("") +
+      `</div>`;
+  }
+
   /* ── Mobile modal logic ──────────────────────── */
   function openRefModal(citation, num) {
-    const doiHref = buildDoiHref(citation.doi);
-    const doiDisplay = buildDoiDisplay(citation.doi);
-    const typeClass = (citation.doc_type === "guideline") ? "guideline" : "paper";
-    const typeLabel = (citation.doc_type === "guideline") ? "guideline" : "paper";
-    const titleText = citation.title || "Untitled";
+    const doiHref = buildDoiHref(citation.doi) || citation.url || "";
+    const doiDisplay = citation.doi ? buildDoiDisplay(citation.doi) : esc(citation.domain || "");
+    const typeClass = docType(citation);
+    const typeLabel = typeClass;
+    const titleText = esc(citation.title || "Untitled");
 
     let html = `<div class="ref-modal-title"><span class="ref-modal-num">${num}</span>`;
     html += doiHref
@@ -280,7 +308,9 @@ sup.cite:hover .cite-tooltip{opacity:1}
     html += `<span class="ref-badge ${typeClass}">${typeLabel}</span>`;
     if (citation.publication_year) html += `<span class="ref-year">${citation.publication_year}</span>`;
     if (doiHref) html += `<a class="ref-doi" href="${doiHref}" target="_blank" rel="noopener">${doiDisplay}</a>`;
+    html += scoreBadge(citation) + foundVia(citation);
     html += `</div>`;
+    html += webLinks(citation.supporting_sources, "Supporting sources");
 
     modalBody.innerHTML = html;
     modalOverlay.classList.add("active");
@@ -433,12 +463,12 @@ sup.cite:hover .cite-tooltip{opacity:1}
       citations.forEach((c, i) => {
         const num = i + 1;
         const refId = `ref-${eid}-${num}`;
-        const typeClass = (c.doc_type === "guideline") ? "guideline" : "paper";
-        const typeLabel = (c.doc_type === "guideline") ? "guideline" : "paper";
-        const doiHref = buildDoiHref(c.doi);
-        const doiDisplay = buildDoiDisplay(c.doi);
+        const typeClass = docType(c);
+        const typeLabel = typeClass;
+        const doiHref = buildDoiHref(c.doi) || c.url || "";
+        const doiDisplay = c.doi ? buildDoiDisplay(c.doi) : esc(c.domain || "");
         const doiLink = doiHref ? `<a class="ref-doi" href="${doiHref}" target="_blank" rel="noopener">${doiDisplay}</a>` : "";
-        const titleText = c.title || "Untitled";
+        const titleText = esc(c.title || "Untitled");
         const titleHtml = doiHref
           ? `<a href="${doiHref}" target="_blank" rel="noopener" class="ref-title">${titleText}</a>`
           : `<span class="ref-title">${titleText}</span>`;
@@ -449,11 +479,24 @@ sup.cite:hover .cite-tooltip{opacity:1}
             `<div class="ref-meta">` +
               `<span class="ref-badge ${typeClass}">${typeLabel}</span>` +
               (c.publication_year ? `<span class="ref-year">${c.publication_year}</span>` : "") +
-              doiLink +
+              doiLink + scoreBadge(c) + foundVia(c) +
             `</div>` +
+            webLinks(c.supporting_sources, "Supporting sources") +
           `</div>`;
       });
       content.appendChild(refsPanel);
+    }
+
+    // Web context (Tavily)
+    const web = data.web_context || {};
+    if (web.sources && web.sources.length) {
+      const panel = content.querySelector(".refs-panel") || content.appendChild(Object.assign(document.createElement("div"), {className: "refs-panel"}));
+      const box = document.createElement("div");
+      box.className = "web-ctx";
+      box.innerHTML = `<div class="refs-title">Web context</div>` +
+        (web.answer ? `<div class="web-answer">${esc(web.answer)}</div>` : "") +
+        webLinks(web.sources, "Sources");
+      panel.appendChild(box);
     }
 
     entry.appendChild(content);
@@ -474,6 +517,8 @@ sup.cite:hover .cite-tooltip{opacity:1}
       `<span>过滤 <span class="accent">${stats.papers_after_filter ?? "?"}</span></span>` +
       `<span class="sep">→</span>` +
       `<span>引用 <span class="accent">${citations.length}</span></span>` +
+      `<span class="sep">|</span>` +
+      `<span>Web <span class="accent">${stats.web_context_sources ?? 0}</span></span>` +
       `<span class="sep">|</span>` +
       `<span>耗时 <span class="accent">${totalSec}s</span></span>`;
     statsWrap.appendChild(statsDiv);

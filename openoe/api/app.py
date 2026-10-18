@@ -17,6 +17,7 @@ from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
 from openoe.pipeline.orchestrator import Orchestrator
 from openoe.sources.openalex import OpenAlexSource
+from openoe.sources.tavily import TavilySource
 
 log = logging.getLogger(__name__)
 
@@ -135,6 +136,10 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
             return FileResponse(html, media_type="text/html")
         return {"message": "Open OE API — visit /docs for API documentation"}
 
+    @app.get("/medicap", include_in_schema=False)
+    async def medicap():
+        return FileResponse(_STATIC_DIR / "medicap.html", media_type="text/html")
+
     if _STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
@@ -150,6 +155,8 @@ def _build_sources(cfg: dict) -> dict:
 
     if any(r.get("source") == "openalex" and r.get("enabled") for r in routes.values()):
         registry["openalex"] = OpenAlexSource()
+    if any(r.get("source") == "tavily" and r.get("enabled") for r in routes.values()):
+        registry["tavily"] = TavilySource()
 
     return registry
 

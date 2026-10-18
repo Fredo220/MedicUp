@@ -1,13 +1,26 @@
 """Document deduplication by DOI / file_hash / fuzzy title."""
 from __future__ import annotations
-from copy import copy
+import re
 from difflib import SequenceMatcher
 from typing import Dict, List, Sequence
 from openoe.core.models import Document
 
 
+_DOI_PREFIX = re.compile(r"^(https?://(dx\.)?doi\.org/|doi:\s*)", re.I)
+
+
+def normalize_doi(doi) -> str:
+    """``https://doi.org/10.1/X`` / ``doi:10.1/X`` / ``10.1/X`` → ``10.1/x``."""
+    return _DOI_PREFIX.sub("", str(doi or "").strip()).lower()
+
+
+def _key_value(doc: Document, field: str) -> str:
+    val = doc.metadata.get(field, "")
+    return normalize_doi(val) if field == "doi" else str(val or "").strip().lower()
+
+
 def canonical_key(doc: Document, field: str = "doi") -> str:
-    val = str(doc.metadata.get(field, "")).strip().lower()
+    val = _key_value(doc, field)
     return f"{field}:{val}" if val else f"id:{doc.id.lower()}"
 
 
@@ -20,7 +33,7 @@ def dedup(
     by_key: Dict[str, Document] = {}
     overflow: List[Document] = []
     for d in docs:
-        k = str(d.metadata.get(field, "")).strip().lower()
+        k = _key_value(d, field)
         if k:
             existing = by_key.get(k)
             if existing is None or (d.score or 0) > (existing.score or 0):

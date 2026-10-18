@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, Optional
 
 from openoe.core.config import apply_overrides
-from openoe.core.models import Document, QueryContext, QueryRequest, QueryResponse
+from openoe.core.models import QueryContext, QueryRequest, QueryResponse
 from openoe.llm.client import LLMClient
 from openoe.llm.prompts import PromptManager
-from openoe.pipeline import safety, enhance, retrieval, merge, filter, answer
+from openoe.pipeline import safety, enhance, retrieval, merge, filter, answer, web_context
+from openoe.utils.score import assign_percent
 
 log = logging.getLogger(__name__)
 
@@ -159,6 +160,19 @@ class Orchestrator:
         await emit("filter", f"保留 {len(ctx.filtered_papers)} 篇相关论文, {len(ctx.filtered_guidelines)} 条指南", {
             "papers_kept": len(ctx.filtered_papers), "guidelines_kept": len(ctx.filtered_guidelines),
         })
+        assign_percent(ctx.filtered_papers)
+        assign_percent(ctx.filtered_guidelines)
+
+        # ── Stage 4b: Web context (Tavily) ───────────────────
+        web_cfg = stages.get("web_context", {})
+        if web_cfg.get("enabled"):
+            await emit("web_context", "正在获取网络背景…", {})
+            t4b = time.perf_counter()
+            ctx.web_context = await web_context.question_context(ctx.translated or ctx.question, web_cfg)
+            ctx.trace.time("stage4b_web_context_ms", (time.perf_counter() - t4b) * 1000)
+            n_web = len(ctx.web_context.get("sources", []))
+            log.info("├─ Stage 4b Web context (%.0fms): %d sources", ctx.trace.timings["stage4b_web_context_ms"], n_web)
+            await emit("web_context", f"网络背景 {n_web} 条", {"sources": n_web})
 
         # ── Stage 5: Answer ──────────────────────────────────
         await emit("answer", "正在生成循证回答…", {})
@@ -167,6 +181,7 @@ class Orchestrator:
         ans = await answer.generate_answer(
             ctx.question, ctx.filtered_papers, ctx.filtered_guidelines,
             stages.get("answer", {}), self.llm, self.prompts, history=ctx.history,
+            web_sources=ctx.web_context.get("sources") if web_cfg.get("feed_answer", True) else None,
         )
         ctx.answer = ans["answer"]
         ctx.markdown = ans["markdown"]
@@ -175,6 +190,14 @@ class Orchestrator:
         ctx.trace.time("stage5_answer_ms", (time.perf_counter() - t5) * 1000)
         log.info("├─ Stage 5 done (%.0fms): %d citations, answer=%d chars",
                  ctx.trace.timings["stage5_answer_ms"], len(ctx.cited_sources), len(ctx.answer or ""))
+
+        # ── Stage 6: Supporting web sources for cited papers ─
+        if web_cfg.get("enabled"):
+            await emit("supporting", "正在查找支持来源…", {})
+            t6 = time.perf_counter()
+            n_sup = await web_context.add_supporting_sources(ctx.cited_sources, web_cfg)
+            ctx.trace.time("stage6_supporting_ms", (time.perf_counter() - t6) * 1000)
+            log.info("├─ Stage 6 Supporting sources (%.0fms): %d papers enriched", ctx.trace.timings["stage6_supporting_ms"], n_sup)
 
         # ── Finalize ─────────────────────────────────────────
         ctx.trace.finish()
@@ -192,6 +215,7 @@ class Orchestrator:
             stats=self._stats(ctx),
             trace_id=ctx.trace.request_id,
             timings=ctx.trace.timings,
+            web_context=ctx.web_context,
         )
 
     # ── Helpers ───────────────────────────────────────────────
@@ -220,6 +244,8 @@ class Orchestrator:
             "guidelines_after_merge": len(ctx.merged_guidelines),
             "guidelines_after_filter": len(ctx.filtered_guidelines),
             "total_citations": len(ctx.cited_sources),
+            "web_context_sources": len(ctx.web_context.get("sources", [])),
+            "papers_with_supporting_sources": sum(1 for c in ctx.cited_sources if c.get("supporting_sources")),
         }
 
     @staticmethod
@@ -234,6 +260,7 @@ class Orchestrator:
             "search_query": ctx.search_query,
             "keywords": ctx.keywords,
             "safety": ctx.safety,
+            "web_context": ctx.web_context,
             "timings": ctx.trace.timings,
             "retrieval": [
                 {"route": t.route, "query": t.query_used, "count": t.result_count,
