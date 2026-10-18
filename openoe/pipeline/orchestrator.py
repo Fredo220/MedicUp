@@ -157,7 +157,7 @@ class Orchestrator:
                  ctx.trace.timings["stage4_filter_ms"],
                  len(ctx.merged_papers), len(ctx.filtered_papers), len(ctx.filtered_guidelines))
         await emit("filter", f"Kept {len(ctx.filtered_papers)} relevant papers, {len(ctx.filtered_guidelines)} guidelines", {
-            "papers_kept": len(ctx.filtered_papers), "guidelines_kept": len(ctx.filtered_guidelines),
+            "papers_kept": len(ctx.filtered_papers), "total": len(ctx.merged_papers), "guidelines_kept": len(ctx.filtered_guidelines),
         })
 
         # ── Stage 5: Answer ──────────────────────────────────

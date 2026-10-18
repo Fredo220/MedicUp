@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MedicUp — Evidence-Based Medical Search</title>
+<title>MedicUp — Discover medical research from your seed papers</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -163,35 +163,155 @@ sup.cite:hover .cite-tooltip{opacity:1}
   .stats-bar{flex-direction:column;gap:4px}
   .cite-tooltip{max-width:200px;white-space:normal}
 }
+.tabs{display:flex;gap:6px;justify-content:center;margin:18px auto 0}
+.tab{background:var(--glass);border:1px solid var(--border);color:var(--text2);border-radius:20px;padding:8px 18px;cursor:pointer;font-size:.9rem;font-family:var(--font)}
+.tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.panel{display:none}.panel.active{display:block}
+.disc-form{max-width:820px;margin:20px auto 12px;padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.disc-form label{font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.disc-form input,.disc-form textarea,.chat-box input{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:1rem;padding:10px 14px;outline:none}
+.disc-form textarea{min-height:110px;font-family:var(--mono);font-size:.85rem;resize:vertical}
+.disc-form input:focus,.disc-form textarea:focus,.chat-box input:focus{border-color:var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--accent);color:#0a1628;border:none;border-radius:var(--rs);padding:10px 22px;font-weight:600;font-size:.95rem;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:var(--glass);color:var(--text2);border:1px solid var(--border);font-weight:500}
+.btn.ghost:hover{color:var(--accent);border-color:var(--accent)}
+.hint{font-size:.8rem;color:var(--muted)}
+.seeds-bar{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+.seed-chip{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:4px 12px;font-size:.8rem;color:var(--text2);max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seed-chip b{color:var(--warn);margin-right:4px}
+.warn-msg{color:var(--warn);font-size:.85rem;margin:4px 0 10px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:var(--glass);border:1px solid var(--border);border-radius:var(--rs);padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:var(--text2)}
+.toolbar select,.toolbar input[type=number],.toolbar input[type=text]{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:.85rem}
+.toolbar input[type=number]{width:80px}
+.toolbar label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.disc-layout{display:block}
+@media(min-width:1000px){.disc-layout{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}}
+.side{display:flex;flex-direction:column;gap:14px}
+.side .box{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.side h3{font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:10px}
+.web-item{font-size:.82rem;margin-bottom:10px}.web-item p{color:var(--muted);font-size:.78rem}
+.pcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;margin-bottom:12px;transition:border var(--ease)}
+.pcard.hl{border-color:var(--accent);background:var(--accent-dim)}
+.pcard.liked{border-left:3px solid var(--accent)}.pcard.disliked{opacity:.45}
+.phead{display:flex;gap:12px;align-items:flex-start}
+.prank{background:var(--accent-dim);color:var(--accent);font-weight:700;border-radius:8px;min-width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
+.ptitle{font-size:1rem;font-weight:600;color:var(--text);line-height:1.4}
+.pmeta{font-size:.8rem;color:var(--text2);margin-top:3px}
+.pscore{margin-left:auto;text-align:right;flex-shrink:0;font-size:.75rem;color:var(--text2)}
+.pscore b{display:block;font-size:1.15rem;color:var(--accent)}
+.scorebar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:4px;width:70px;overflow:hidden}.scorebar i{display:block;height:100%;background:var(--accent)}
+.why{margin:10px 0 6px;font-size:.92rem;line-height:1.6}
+.quote{border-left:3px solid var(--accent);background:var(--glass);padding:6px 12px;margin:6px 0;font-size:.85rem;color:var(--text2);font-style:italic;border-radius:0 6px 6px 0}
+.quote.unv{border-left-color:var(--warn)}
+.qflag{font-style:normal;font-size:.72rem;margin-left:6px;font-weight:600}
+.qflag.ok{color:var(--accent)}.qflag.no{color:var(--warn)}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sig{font-size:.72rem;padding:2px 8px;border-radius:4px;background:rgba(120,160,255,.12);color:#9fb8ff}
+.sig.cite{background:rgba(0,212,170,.12);color:var(--accent)}.sig.web{background:rgba(255,192,120,.15);color:var(--warn)}
+.sig.oa{background:rgba(120,255,140,.12);color:#8fe39b}
+.plinks{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;align-items:center}
+.plinks button{background:none;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.78rem}
+.plinks button:hover{color:var(--accent);border-color:var(--accent)}
+.plinks button.on{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+.abstract{display:none;font-size:.83rem;color:var(--text2);margin-top:8px;line-height:1.6}.abstract.open{display:block}
+.comp{font-size:.72rem;color:var(--muted);margin-top:4px}
+.graph-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:8px;margin-bottom:14px;display:none}
+.graph-wrap.open{display:block}
+.graph-wrap svg{width:100%;height:520px}
+.chat{margin-top:22px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px}
+.chat h3{font-size:.95rem;margin-bottom:10px}
+.msg{margin:10px 0;font-size:.92rem;line-height:1.65}
+.msg.user{color:var(--accent);background:var(--accent-dim);padding:8px 12px;border-radius:var(--rs)}
+.msg.bot p{margin:6px 0}
+.chat-box{display:flex;gap:8px;margin-top:10px}.chat-box input{flex:1}
+.thread-actions{max-width:720px;margin:-6px auto 10px;padding:0 20px;text-align:right}
 </style>
 </head>
 <body>
-
-<!-- Header -->
 <header class="header">
   <h1><span>Medic</span>Up</h1>
-  <p>Evidence-Based Medical AI</p>
+  <p>Start from papers you trust. Discover the ones you're missing.</p>
+  <div class="tabs">
+    <button class="tab active" data-tab="discover">Discover papers</button>
+    <button class="tab" data-tab="ask">Ask the literature</button>
+  </div>
 </header>
 
-<!-- Search -->
+<section class="panel active" id="panel-discover">
+  <form class="disc-form" id="discForm" autocomplete="off">
+    <label for="discQuestion">Research question (optional)</label>
+    <input id="discQuestion" type="text" placeholder="e.g. Which immune checkpoint inhibitor combinations improve survival in metastatic melanoma?">
+    <label for="discSeeds">Seed papers — one per line (DOI, PMID, PubMed/DOI/OpenAlex URL, or title)</label>
+    <textarea id="discSeeds" placeholder="10.1056/NEJMoa1003466&#10;10.1056/NEJMoa1504030"></textarea>
+    <div class="row">
+      <button class="btn" type="submit" id="discBtn">Discover</button>
+      <button class="btn ghost" type="button" id="discExample">Load example</button>
+      <span class="hint">Combines citation links, Semantic Scholar recommendations, Nebius embeddings, OpenAlex search and Tavily web search; ranked and explained by an LLM.</span>
+    </div>
+  </form>
+  <div class="container">
+    <div class="progress-section" id="discProgress">
+      <div class="progress-card">
+        <div class="progress-title">Discovering…</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="discBar"></div></div>
+        <div class="stage-list" id="discStages"></div>
+      </div>
+    </div>
+    <div id="discError"></div>
+    <div id="discResults" style="display:none">
+      <div class="seeds-bar" id="seedsBar"></div>
+      <div id="unresolved"></div>
+      <div class="toolbar" id="toolbar">
+        <span>Sort <select id="fSort"><option value="score">Relevance score</option><option value="year">Newest</option><option value="cites">Most cited</option></select></span>
+        <span>From year <input type="number" id="fYear" placeholder="any"></span>
+        <label><input type="checkbox" id="fOA"> Open access only</label>
+        <label><input type="checkbox" id="fVerified"> Verified quote only</label>
+        <span>Found via <select id="fSignal"><option value="">any signal</option><option value="cited_by_seeds">Cited by seeds</option><option value="cites_seeds">Cites seeds</option><option value="related">Related to seeds</option><option value="s2_recommendation">Semantic Scholar rec.</option><option value="search">Search</option><option value="web">Web (Tavily)</option></select></span>
+        <input type="text" id="fText" placeholder="Filter text…">
+        <button class="btn ghost" type="button" id="graphBtn">Show map</button>
+        <button class="btn ghost" type="button" id="csvBtn">Export CSV</button>
+        <button class="btn" type="button" id="rerunBtn" disabled>Re-run with feedback</button>
+      </div>
+      <div class="graph-wrap" id="graphWrap"></div>
+      <div class="disc-layout">
+        <div>
+          <div class="stats-bar" id="discStats" style="margin-bottom:12px"></div>
+          <div id="cards"></div>
+          <div class="chat" id="chat">
+            <h3>Ask follow-up questions about these papers</h3>
+            <div id="chatLog"></div>
+            <form class="chat-box" id="chatForm" autocomplete="off">
+              <input id="chatInput" type="text" placeholder="e.g. Which of these are randomized trials, and what did they find?">
+              <button class="btn" type="submit" id="chatBtn">Ask</button>
+            </form>
+          </div>
+        </div>
+        <aside class="side">
+          <div class="box"><h3>How the score works</h3><p class="hint">60% LLM relevance judgement (Nebius) + 40% pre-score: embedding similarity to your question and seeds (50%), number of seeds linked by citations (30%), number of independent signals (10%), Semantic Scholar recommendation (10%). Quotes are checked word-for-word against the abstract.</p></div>
+          <div class="box" id="webBox"><h3>Web context (Tavily)</h3><div id="webList" class="hint">None</div></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="panel-ask">
 <div class="search-wrap">
   <form class="search-box" id="searchForm" autocomplete="off">
-    <input type="text" id="queryInput" placeholder="Ask a medical research question…" autofocus>
+    <input type="text" id="queryInput" placeholder="Ask a medical research question…">
     <button type="submit" id="submitBtn">Search</button>
   </form>
 </div>
-
-<!-- Example chips -->
+<div class="thread-actions"><button class="btn ghost" type="button" id="newThread">New conversation</button></div>
 <div class="examples" id="examples">
   <span class="chip" data-q="What are the safety considerations when using JAK inhibitors?">JAK inhibitor safety</span>
   <span class="chip" data-q="What are the main safety risks of GLP-1 receptor agonists?">GLP-1 agonist risks</span>
   <span class="chip" data-q="How should HbA1c targets be set for patients with type 2 diabetes?">HbA1c targets</span>
   <span class="chip" data-q="Can patients with recurrent ovarian cancer who already received bevacizumab benefit from anti-angiogenic re-treatment?">Ovarian cancer re-treatment</span>
 </div>
-
-<!-- Main container -->
 <div class="container">
-  <!-- Progress -->
   <div class="progress-section" id="progressSection">
     <div class="progress-card">
       <div class="progress-title">Working…</div>
@@ -199,21 +319,17 @@ sup.cite:hover .cite-tooltip{opacity:1}
       <div class="stage-list" id="stageList"></div>
     </div>
   </div>
-
-  <!-- Results history -->
   <div id="resultsHistory"></div>
 </div>
+</section>
 
-<!-- Mobile reference modal -->
 <div class="ref-modal-overlay" id="refModalOverlay">
   <div class="ref-modal" id="refModal">
     <button class="ref-modal-close" id="refModalClose" aria-label="Close">&times;</button>
     <div id="refModalBody"></div>
   </div>
 </div>
-
-<!-- Footer -->
-<footer class="footer">MedicUp · for research only · not medical advice</footer>
+<footer class="footer">MedicUp · for research only · not medical advice · data: OpenAlex, Semantic Scholar, Tavily · AI: Nebius Token Factory</footer>
 
 <script>
 (function(){
@@ -317,7 +433,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
       case "enhance":   return data.search_query ? `"${data.search_query}"` : "";
       case "retrieval": return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";
       case "merge":     return (data.papers != null) ? `papers ${data.papers}, guidelines ${data.guidelines||0}` : "";
-      case "filter":    return (data.papers_kept != null) ? `kept ${data.papers_kept} / ${data.total||"?"}` : "";
+      case "filter":    return (data.papers_kept != null) ? `kept ${data.papers_kept} / ${data.total||data.papers_total||"–"}` : "";
       case "done":      return (data.citations != null) ? `citations ${data.citations}` : "";
       default: return "";
     }
@@ -360,6 +476,8 @@ sup.cite:hover .cite-tooltip{opacity:1}
 
   /* ── Entry ID counter (for unique ref IDs) ───── */
   let _entryId = 0;
+  let convo = [];
+  document.getElementById("newThread").addEventListener("click", () => { convo = []; history.innerHTML = ""; input.focus(); });
 
   /* ── Citation click handler ──────────────────── */
   /* Stored per-entry so the modal can access citation data */
@@ -461,17 +579,17 @@ sup.cite:hover .cite-tooltip{opacity:1}
     // Stats bar (full width, below the split)
     const stats = data.stats || {};
     const timings = data.timings || {};
-    const totalSec = timings.total_ms != null ? (timings.total_ms / 1000).toFixed(1) : "?";
+    const totalSec = timings.total_ms != null ? (timings.total_ms / 1000).toFixed(1) : "–";
     const statsWrap = document.createElement("div");
     statsWrap.className = "qa-stats";
     const statsDiv = document.createElement("div");
     statsDiv.className = "stats-bar";
     statsDiv.innerHTML =
-      `<span>Retrieved <span class="accent">${stats.papers_retrieved ?? "?"}</span></span>` +
+      `<span>Retrieved <span class="accent">${stats.papers_retrieved ?? "–"}</span></span>` +
       `<span class="sep">→</span>` +
-      `<span>Merged <span class="accent">${stats.papers_after_merge ?? "?"}</span></span>` +
+      `<span>Merged <span class="accent">${stats.papers_after_merge ?? "–"}</span></span>` +
       `<span class="sep">→</span>` +
-      `<span>Relevant <span class="accent">${stats.papers_after_filter ?? "?"}</span></span>` +
+      `<span>Relevant <span class="accent">${stats.papers_after_filter ?? "–"}</span></span>` +
       `<span class="sep">→</span>` +
       `<span>Cited <span class="accent">${citations.length}</span></span>` +
       `<span class="sep">|</span>` +
@@ -480,7 +598,8 @@ sup.cite:hover .cite-tooltip{opacity:1}
     entry.appendChild(statsWrap);
 
     // Prepend to history (newest first)
-    history.insertBefore(entry, history.firstChild);
+    history.appendChild(entry);
+    entry.scrollIntoView({behavior:'smooth',block:'start'});
   }
 
   /* ── Main query function ──────────────────────── */
@@ -506,7 +625,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
     let didFallback = false;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({question}));
+      ws.send(JSON.stringify({question, history: convo.slice()}));
     };
 
     ws.onmessage = evt => {
@@ -535,6 +654,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
     progressSec.classList.remove("active");
     submitBtn.disabled = false;
     renderResult(question, data);
+    convo.push({role:"user",content:question},{role:"assistant",content:(data.answer||"").slice(0,4000)});
     input.value = "";
     input.focus();
   }
@@ -550,7 +670,7 @@ sup.cite:hover .cite-tooltip{opacity:1}
     fetch("/api/query", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({question})
+      body: JSON.stringify({question, history: convo.slice()})
     })
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -568,10 +688,181 @@ sup.cite:hover .cite-tooltip{opacity:1}
       const errDiv = document.createElement("div");
       errDiv.className = "error-msg";
       errDiv.textContent = "Query failed: " + err.message;
-      history.insertBefore(errDiv, history.firstChild);
+      history.appendChild(errDiv);
     });
   }
 
+})();
+</script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+t.dataset.tab));
+}));
+const STAGES=[{key:"seeds",label:"Resolve seed papers"},{key:"candidates",label:"Collect candidates (citations, recommendations, search, web)"},{key:"rank",label:"Embed & pre-rank (Nebius embeddings)"},{key:"judge",label:"LLM relevance judgement & explanations"},{key:"done",label:"Done"}];
+const SIGLABEL={cited_by_seeds:"Cited by",cites_seeds:"Cites",related:"Related to",s2_recommendation:"Semantic Scholar rec.",search:"Search",web:"Web"};
+let state={req:null,data:null,liked:new Set(),disliked:new Set(),chat:[]};
+
+$("discExample").addEventListener("click",()=>{
+  $("discQuestion").value="Which immune checkpoint inhibitor combinations improve survival in metastatic melanoma?";
+  $("discSeeds").value="10.1056/NEJMoa1003466\n10.1056/NEJMoa1504030";
+});
+$("discForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const seeds=$("discSeeds").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!seeds.length){$("discSeeds").focus();return;}
+  state.liked.clear();state.disliked.clear();
+  run({question:$("discQuestion").value.trim(),seeds,disliked:[],limit:20});
+});
+$("rerunBtn").addEventListener("click",()=>{
+  if(!state.req)return;
+  const extra=[...state.liked].map(id=>"W"+id.replace(/^W/,""));
+  const seeds=[...new Set([...state.req.seeds,...extra])];
+  const disliked=[...new Set([...(state.req.disliked||[]),...state.disliked])];
+  $("discSeeds").value=seeds.join("\n");
+  state.liked.clear();state.disliked.clear();
+  run({question:state.req.question,seeds,disliked,limit:state.req.limit});
+});
+
+function stages(){ $("discStages").innerHTML=STAGES.map(s=>`<div class="stage-item" id="ds-${s.key}"><span class="stage-icon">○</span><span class="stage-label">${s.label}</span><span class="stage-detail" id="dsd-${s.key}"></span></div>`).join(""); $("discBar").style.width="0%"; }
+function stage(key,msg){
+  const idx=STAGES.findIndex(s=>s.key===key); if(idx<0)return;
+  STAGES.forEach((s,i)=>{const el=$("ds-"+s.key);el.className="stage-item"+(i<idx?" completed":i===idx?" active":"");el.querySelector(".stage-icon").textContent=i<idx?"✓":i===idx?"●":"○";});
+  if(msg)$("dsd-"+key).textContent="— "+msg;
+  $("discBar").style.width=Math.round((idx+1)/STAGES.length*100)+"%";
+}
+function run(req){
+  state.req=req; $("discBtn").disabled=true; $("rerunBtn").disabled=true; $("discError").innerHTML="";
+  $("discProgress").classList.add("active"); stages();
+  let done=false;
+  const fail=m=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; $("discError").innerHTML=`<div class="error-msg">Discovery failed: ${esc(m)}</div>`; };
+  const finish=d=>{ if(done)return; done=true; $("discProgress").classList.remove("active"); $("discBtn").disabled=false; state.data=d; state.chat=[]; $("chatLog").innerHTML=""; render(); };
+  const post=()=>fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(req)}).then(r=>{if(!r.ok)return r.text().then(t=>{throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`)});return r.json();}).then(finish).catch(e=>fail(e.message));
+  let ws; try{ws=new WebSocket(`${location.protocol==="https:"?"wss:":"ws:"}//${location.host}/ws/discover`);}catch(_){return post();}
+  let opened=false;
+  ws.onopen=()=>{opened=true;ws.send(JSON.stringify(req));};
+  ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch(_){return;}
+    if(m.type==="progress")stage(m.stage,m.message); else if(m.type==="result")finish(m.data); else if(m.type==="error")fail(m.message||"error");};
+  ws.onerror=()=>{if(!opened&&!done)post();};
+  ws.onclose=()=>{if(opened&&!done)fail("connection closed");};
+}
+
+function sigText(s,seeds){
+  const S=a=>(a||[]).map(i=>"S"+(i+1)).join(", ");
+  switch(s.type){
+    case "cited_by_seeds":return `Cited by ${S(s.seeds)}`;
+    case "cites_seeds":return `Cites ${S(s.seeds)}`;
+    case "related":return `Related to ${S(s.seeds)}`;
+    case "s2_recommendation":return `Semantic Scholar rec. #${s.rank}`;
+    case "search":return `Search: “${s.query}”`;
+    case "web":{let h=s.url;try{h=new URL(s.url).hostname.replace(/^www\./,"");}catch(_){}return `Web: ${h}`;}
+    default:return s.type;
+  }
+}
+function sigClass(t){return t==="web"?"web":(t==="cited_by_seeds"||t==="cites_seeds"||t==="related")?"cite":"";}
+function filtered(){
+  const d=state.data; if(!d)return [];
+  const y=parseInt($("fYear").value,10), oa=$("fOA").checked, ver=$("fVerified").checked, sg=$("fSignal").value, tx=$("fText").value.trim().toLowerCase();
+  let r=(d.results||[]).filter(p=>(!y||(p.year||0)>=y)&&(!oa||p.is_oa)&&(!ver||p.quote_verified)&&(!sg||(p.signals||[]).some(s=>s.type===sg))&&(!tx||((p.title||"")+" "+(p.abstract||"")+" "+(p.why||"")).toLowerCase().includes(tx)));
+  const k=$("fSort").value;
+  if(k==="year")r.sort((a,b)=>(b.year||0)-(a.year||0)); else if(k==="cites")r.sort((a,b)=>(b.cited_by_count||0)-(a.cited_by_count||0)); else r.sort((a,b)=>a.rank-b.rank);
+  return r;
+}
+["fSort","fYear","fOA","fVerified","fSignal","fText"].forEach(id=>$(id).addEventListener("input",()=>{renderCards();if($("graphWrap").classList.contains("open"))graph();}));
+
+function render(){
+  const d=state.data; $("discResults").style.display="block";
+  $("seedsBar").innerHTML=(d.seeds||[]).map((s,i)=>`<a class="seed-chip" href="${esc(s.links?.doi||s.links?.openalex||"#")}" target="_blank" rel="noopener" title="${esc(s.title)}"><b>S${i+1}</b>${esc(s.title)}${s.year?` (${s.year})`:""}</a>`).join("");
+  $("unresolved").innerHTML=(d.unresolved||[]).length?`<div class="warn-msg">Could not resolve: ${d.unresolved.map(esc).join(", ")}</div>`:"";
+  if((d.errors||[]).length)$("unresolved").innerHTML+=`<div class="warn-msg">Some sources had errors (results may be incomplete): ${d.errors.slice(0,3).map(e=>esc(typeof e==="string"?e:JSON.stringify(e)).slice(0,160)).join("; ")}</div>`;
+  const st=d.stats||{}, tm=d.timings||{};
+  const totMs=tm.total_ms??tm.done??Object.values(tm).reduce((a,b)=>Math.max(a,+b||0),0); const tot=(totMs/1000).toFixed(1);
+  const sigCounts=st.signals||st.by_signal||{};
+  $("discStats").innerHTML=`<span>Seeds <span class="accent">${(d.seeds||[]).length}</span></span><span class="sep">→</span><span>Candidates <span class="accent">${st.n_candidates??"–"}</span></span><span class="sep">→</span><span>LLM-judged <span class="accent">${st.n_judged??"–"}</span></span><span class="sep">→</span><span>Shown <span class="accent">${(d.results||[]).length}</span></span><span class="sep">|</span>`+Object.entries(sigCounts).map(([k,v])=>`<span>${esc(SIGLABEL[k]||k)} <span class="accent">${v}</span></span>`).join("")+`<span class="sep">|</span><span>Time <span class="accent">${tot}s</span></span>`;
+  $("webList").innerHTML=(d.web_context||[]).length?d.web_context.map(w=>`<div class="web-item"><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title||w.url)}</a><p>${esc(w.snippet||"")}</p></div>`).join(""):"No web context (Tavily disabled or no results).";
+  renderCards(); if($("graphWrap").classList.contains("open"))graph();
+}
+function renderCards(){
+  const list=filtered();
+  $("cards").innerHTML=list.length?list.map(card).join(""):`<div class="hint">No results match the filters.</div>`;
+}
+function card(p){
+  const id=p.openalex_id, L=p.links||{}, c=p.components||{};
+  const sigs=(p.signals||[]).map(s=>`<span class="sig ${sigClass(s.type)}">${esc(sigText(s))}</span>`).join("")+(p.is_oa?`<span class="sig oa">Open access</span>`:"");
+  const rel=(p.related_seeds||[]).map(i=>"S"+(i+1)).join(", ");
+  const quote=p.quote?`<div class="quote ${p.quote_verified?"":"unv"}">“${esc(p.quote)}”<span class="qflag ${p.quote_verified?"ok":"no"}">${p.quote_verified?"✓ verified in abstract":"⚠ not found verbatim in abstract"}</span></div>`:`<div class="hint">No supporting quote from the abstract.</div>`;
+  const links=[L.doi&&`<a href="${esc(L.doi)}" target="_blank" rel="noopener">DOI</a>`,L.pubmed&&`<a href="${esc(L.pubmed)}" target="_blank" rel="noopener">PubMed</a>`,L.openalex&&`<a href="${esc(L.openalex)}" target="_blank" rel="noopener">OpenAlex</a>`,p.oa_url&&`<a href="${esc(p.oa_url)}" target="_blank" rel="noopener">Full text</a>`].filter(Boolean).join("");
+  const cls=state.liked.has(id)?" liked":state.disliked.has(id)?" disliked":"";
+  const f=v=>v==null?"–":(+v).toFixed(2);
+  return `<div class="pcard${cls}" id="pc-${esc(id)}">
+<div class="phead"><div class="prank">${p.rank}</div><div style="flex:1;min-width:0"><div class="ptitle">${L.doi||L.openalex?`<a href="${esc(L.doi||L.openalex)}" target="_blank" rel="noopener" style="color:inherit">${esc(p.title)}</a>`:esc(p.title)}</div>
+<div class="pmeta">${esc(Array.isArray(p.authors)?p.authors.join(", "):(p.authors||""))}${p.venue?` · ${esc(p.venue)}`:""}${p.year?` · ${p.year}`:""} · cited ${p.cited_by_count??0}×${p.type?` · ${esc(p.type)}`:""}</div></div>
+<div class="pscore"><b>${Math.round((p.score||0)*100)}</b>score<div class="scorebar"><i style="width:${Math.round((p.score||0)*100)}%"></i></div></div></div>
+<div class="why"><strong>Why relevant:</strong> ${esc(p.why||"—")}${rel?` <span class="hint">(relates to ${rel})</span>`:""}</div>
+${quote}
+<div class="badges">${sigs}</div>
+<div class="comp">LLM relevance ${c.llm_relevance??"–"}/10 · similarity ${f(c.similarity)} · linked seeds ${c.seed_links??0} · signals ${c.n_signals??(p.signals||[]).length} · pre-score ${f(c.pre_score)}</div>
+<div class="plinks" style="margin-top:8px">${links}
+<button type="button" data-act="abs" data-id="${esc(id)}">Abstract</button>
+<button type="button" data-act="like" data-id="${esc(id)}" class="${state.liked.has(id)?"on":""}">👍 Add as seed</button>
+<button type="button" data-act="dislike" data-id="${esc(id)}" class="${state.disliked.has(id)?"on":""}">👎 Not relevant</button></div>
+<div class="abstract" id="abs-${esc(id)}">${esc(p.abstract||"No abstract available.")}</div></div>`;
+}
+$("cards").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]"); if(!b)return; const id=b.dataset.id;
+  if(b.dataset.act==="abs"){$("abs-"+id).classList.toggle("open");return;}
+  const [a,o]=b.dataset.act==="like"?[state.liked,state.disliked]:[state.disliked,state.liked];
+  if(a.has(id))a.delete(id); else {a.add(id);o.delete(id);}
+  $("rerunBtn").disabled=!(state.liked.size||state.disliked.size);
+  $("rerunBtn").textContent=`Re-run with feedback${state.liked.size||state.disliked.size?` (+${state.liked.size} / −${state.disliked.size})`:""}`;
+  renderCards();
+});
+
+$("graphBtn").addEventListener("click",()=>{const w=$("graphWrap");w.classList.toggle("open");$("graphBtn").textContent=w.classList.contains("open")?"Hide map":"Show map";if(w.classList.contains("open"))graph();});
+function graph(){
+  const d=state.data, seeds=d.seeds||[], res=filtered().slice(0,30), W=1000,H=520,cx=W/2,cy=H/2;
+  const sp=seeds.map((s,i)=>{const a=(i/Math.max(1,seeds.length))*2*Math.PI-Math.PI/2,r=seeds.length>1?70:0;return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};});
+  const rp=res.map((p,i)=>{const a=(i/Math.max(1,res.length))*2*Math.PI-Math.PI/2,r=150+(1-(p.score||0))*170;return {x:cx+r*1.55*Math.cos(a),y:cy+r*Math.sin(a)*.95};});
+  let edges="",nodes="";
+  res.forEach((p,i)=>{const linked=new Set();(p.signals||[]).forEach(s=>(s.seeds||[]).forEach(k=>linked.add(k)));(p.related_seeds||[]).forEach(k=>linked.add(k));
+    linked.forEach(k=>{if(sp[k])edges+=`<line x1="${sp[k].x}" y1="${sp[k].y}" x2="${rp[i].x}" y2="${rp[i].y}" stroke="rgba(0,212,170,.25)" stroke-width="1.2"/>`;});
+    const r=7+(p.score||0)*10, col=(p.signals||[]).some(s=>s.type==="web")?"#ffc078":linked.size?"#00d4aa":"#9fb8ff";
+    nodes+=`<g style="cursor:pointer" data-id="${esc(p.openalex_id)}"><circle cx="${rp[i].x}" cy="${rp[i].y}" r="${r}" fill="${col}" fill-opacity=".75"><title>#${p.rank} ${esc(p.title)} (${p.year||""})</title></circle><text x="${rp[i].x}" y="${rp[i].y+3.5}" font-size="10" text-anchor="middle" fill="#0a1628" font-weight="700">${p.rank}</text></g>`;});
+  seeds.forEach((s,i)=>{nodes+=`<g><circle cx="${sp[i].x}" cy="${sp[i].y}" r="18" fill="#ff8f6b"><title>S${i+1} ${esc(s.title)}</title></circle><text x="${sp[i].x}" y="${sp[i].y+4}" font-size="11" text-anchor="middle" fill="#0a1628" font-weight="700">S${i+1}</text></g>`;});
+  $("graphWrap").innerHTML=`<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}<text x="12" y="20" fill="#8899aa" font-size="12">Seeds (orange) in the centre · results closer = higher score · green = linked to seeds by citations · blue = found by similarity/search/recommendation · amber = web · click a node</text></svg>`;
+  $("graphWrap").querySelectorAll("g[data-id]").forEach(g=>g.addEventListener("click",()=>focusCard(g.dataset.id)));
+}
+function focusCard(id){const el=$("pc-"+id);if(!el)return;el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("hl");setTimeout(()=>el.classList.remove("hl"),2000);}
+
+$("csvBtn").addEventListener("click",()=>{
+  const rows=[["rank","score","title","year","venue","authors","doi","pubmed","openalex","cited_by","open_access","why","quote","quote_verified","signals"]];
+  filtered().forEach(p=>rows.push([p.rank,(p.score||0).toFixed(3),p.title,p.year,p.venue,Array.isArray(p.authors)?p.authors.join(", "):p.authors,p.links?.doi,p.links?.pubmed,p.links?.openalex,p.cited_by_count,p.is_oa,p.why,p.quote,p.quote_verified,(p.signals||[]).map(s=>sigText(s)).join("; ")]));
+  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="medicup-discovery.csv";a.click();
+});
+
+$("chatForm").addEventListener("submit",e=>{
+  e.preventDefault(); const q=$("chatInput").value.trim(); if(!q||!state.data)return;
+  const papers=(state.data.results||[]).slice().sort((a,b)=>a.rank-b.rank).map(p=>({openalex_id:p.openalex_id,title:p.title,year:p.year,abstract:p.abstract,links:p.links,venue:p.venue,authors:p.authors}));
+  const log=$("chatLog"); log.insertAdjacentHTML("beforeend",`<div class="msg user">${esc(q)}</div><div class="msg bot hint" id="pending">Thinking…</div>`);
+  $("chatInput").value=""; $("chatBtn").disabled=true;
+  const hist=state.chat.slice();
+  fetch("/api/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:hist,papers})})
+  .then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(d=>{
+    let h=marked.parse(d.answer||"");
+    h=h.replace(/\[\^(\d+)\]/g,(_,n)=>{const p=papers[+n-1];return `<sup class="cite" data-id="${p?esc(p.openalex_id):""}">${n}<span class="cite-tooltip">${p?esc(p.title):"Ref "+n}</span></sup>`;});
+    $("pending").outerHTML=`<div class="msg bot">${h}</div>`;
+    state.chat.push({role:"user",content:q},{role:"assistant",content:(d.answer||"").slice(0,4000)});
+  })
+  .catch(err=>{$("pending").outerHTML=`<div class="error-msg">Follow-up failed: ${esc(err.message)}</div>`;})
+  .finally(()=>{$("chatBtn").disabled=false;$("chatInput").focus();});
+});
+$("chatLog").addEventListener("click",e=>{const s=e.target.closest("sup.cite[data-id]");if(s&&s.dataset.id)focusCard(s.dataset.id);});
 })();
 </script>
 </body>
