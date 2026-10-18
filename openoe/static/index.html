@@ -474,7 +474,6 @@ function setMode(m){
   const name=m==="discover"?"MedicUp Discover":"MedicUp Ask";
   $("modelName").textContent=name;$("heroName").textContent=name;
   $("modelMenu").querySelectorAll("[data-mode]").forEach(b=>b.classList.toggle("sel",b.dataset.mode===m));
-  if(m==="discover"&&!hasDiscovery())openSeeds(true);
   if(m==="ask")openSeeds(false);
   updateComposer();
 }
@@ -510,7 +509,7 @@ $("composer").addEventListener("submit",e=>{e.preventDefault();if(busy)return;
 function clearComposer(){input.value="";seedsEl.value="";openSeeds(false);autosize();updateComposer();}
 
 /* ---------- chats ---------- */
-function newChat(){cur=null;renderAll();input.focus();if(prefs.mode==="discover")openSeeds(true);}
+function newChat(){cur=null;renderAll();input.focus();openSeeds(false);}
 $("newChat").onclick=newChat;
 function ensureChat(title){let c=chat();if(!c){c={id:uid(),title:title.slice(0,80)||"New chat",created:Date.now(),msgs:[]};chats.unshift(c);cur=c.id;}return c;}
 $("searchBtn").onclick=()=>{$("sideSearch").classList.toggle("open");$("sideSearch").focus();};
