@@ -1,230 +1,180 @@
 # MedicUp
 
-Evidence-based medical literature search engine with cited answers and follow-up questions.
-Built on [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) (MIT) and powered by [Nebius Token Factory](https://tokenfactory.nebius.com).
+**From the papers you trust to the evidence you need.**
 
-Quick start:
+MedicUp is a medical research discovery engine for doctors and researchers. You start with a clinical question, a few papers you already trust, or both. MedicUp follows citations, meaning and the web, ranks what it finds, explains why each paper matters and where it was found, and lets you keep or reject every recommendation. Follow-up questions build on what you kept.
 
-```bash
-cp .env_template .env   # add NEBIUS_API_KEY
-pip install -e .
-openoe --port 8000      # open http://localhost:8000
-```
+Built for the techeurope hackathon on [Nebius Token Factory](https://tokenfactory.nebius.com) (LLM inference and embeddings) and [Tavily](https://www.tavily.com) (agentic web search). Foundation: [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) (MIT).
 
 ---
 
-<div align="center">
+## The vision
 
-# 🏥 OpenOE-Lite
+A doctor has a patient question, two papers they trust, and under five minutes to find what else matters. Keyword search alone does not get there: it returns thousands of hits, none of them connected to what the doctor already knows.
 
-**一个 API Key、零向量库、零本地语料<br>直接从 2.5 亿篇开放学术论文中生成循证医学回答**
+MedicUp treats the problem as abduction: the clues are the papers you trust plus your question; the best explanation is the set of papers that connect them, with a stated reason. The hackathon brief says it plainly:
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![OpenAlex](https://img.shields.io/badge/data-OpenAlex-orange)](https://openalex.org)
-[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-blueviolet)](https://openrouter.ai)
+> "help a researcher move from known papers to a ranked, traceable set of new ones. It should make clear why each recommendation is relevant and where the supporting information came from."
 
-完全开源地轻量级复现 [OpenEvidence](https://www.openevidence.com/) 风格的医疗循证问答体验。<br>
-不建索引，不存论文，不训模型，一个API就跑起来 — 用查询时编排替代预处理重资产。
+Three principles follow from that:
 
-💡 **为什么是 Lite？** — 除了一个 LLM API，仅依赖 [OpenAlex](https://openalex.org) 的 2.5 亿篇开放学术数据。无需向量数据库、无需 Embedding 模型、无需下载处理论文，略过昂贵繁重的数据集处理和embedding，即刻跑通。
+1. **Start from what you know.** Seed papers and your question are the input, not a bag of keywords.
+2. **Every recommendation is traceable.** Each paper shows *why* it is here, *which signals* found it, and links to the source. Several independent signals have to agree before a paper ranks high.
+3. **AI proposes, doctors decide.** You keep or reject papers; kept papers become the seeds of your next question. If no sources are found, there is no answer.
 
-[中文](#中文) · [English](#english)
-
-<img src="imgs/screenshot.png" alt="OpenOE-Lite Screenshot" width="900">
-
-</div>
+Background numbers from the team's research, to be checked against the original studies before quoting them: doctors spend under 5 minutes per clinical question, about 60% of their questions go unanswered, and PubMed answers fewer questions than curated tools such as UpToDate (63% vs 83%).
 
 ---
 
-<a id="中文"></a>
+## What you get
 
-## 🇨🇳 中文
+A chat interface in the style of Open WebUI. Type anything and press Enter. Seed papers are optional and live behind the **+** / **Seed papers** button (DOI, PMID, PubMed or OpenAlex link, or a title, one per line).
 
-### ✨ 特点
+Every answer has the same shape:
 
-- 🪶 **无需本地向量数据库** — 无本地语料、无 Embedding 预处理、无索引构建。基于 [OpenAlex](https://openalex.org) 2.5 亿篇开放学术文献实时检索，一个 API Key 开箱即用
-- 🔍 **跨语言三视角检索** — 中文问题自动生成：英文学术检索式 + 自然语言改写 + HyDE 假想摘要，三条路径同时召回，用查询增强替代本地索引
-- 🎯 **小模型证据门控** — 廉价推理模型并发审读每篇候选，将无关论文挡在大模型上下文之外。看似多一步，实则总 token 更少、延迟更低、回答更准
-- 📝 **Grounded Answer** — 循证结构化回答，引用自动重编号并与源文献对齐，每个结论可溯源到具体论文
-- 🧩 **Lite 内核，Full 上限** — 统一文档模型 + 六阶段编排 + 可插拔数据源，从零索引平滑升级到本地向量库 + 临床指南的完整 RAG
+1. **Cited answer**, written only from the retrieved papers, with footnote citations.
+2. **Suggested follow-ups**: three questions a clinician would ask next, generated from the content. Click one and MedicUp runs a new search with your kept papers as seeds and the conversation as context.
+3. **Paper panel** (scrollable): for each paper, title, authors, journal, year, study design, *Why* it is relevant, *Found via* which signals, the % match with its breakdown, DOI / PubMed / full-text links, the abstract, a citation export, and **Keep / Reject**.
+4. **Citation graph**: your seeds (or your question) in the middle row, the ranked papers branching above and below on curved links. Dot size is the score; branches are citation links; hover a dot to light up its chain and figures; click a dot to jump to the paper.
 
-> *「一番の近道は遠回りだった。遠回りこそが俺の最短の道だった」*
-> — Gyro Zeppeli, **Lesson 5** (《JOJO的奇妙冒险 第七部 飙马野郎》)
->
-> 小模型全文过滤看似绕了远路，但把噪音挡在大模型上下文之外，节省了回答模型的昂贵context window，反而省时又省钱。
+Further tabs: **Clusters** (grouped by research topic), **Web sources** (background found by Tavily), **Trace** (where the results came from and how long each step took). The reading list exports as BibTeX, RIS, Markdown or CSV. Light and dark mode, mobile layout, saved chats.
 
-### 🏗️ 管线架构
-
-```
-用户提问（中文 / 英文）
-  │
-  ├─ Stage 0: 安全边界          轻量 LLM 拦截非医学/危险问题
-  ├─ Stage 1: 三视角查询增强     检索式生成 + 英文改写 + HyDE 假想摘要
-  ├─ Stage 2: 开放学术检索       三策略从 2.5 亿篇论文中召回候选
-  ├─ Stage 3: 去重与排序         DOI/标题模糊去重 + RRF 多路融合
-  ├─ Stage 4: 小模型证据门控     廉价模型并发审读，砍掉噪音 ← 真正的捷径
-  └─ Stage 5: 循证回答生成       强模型精读 + 引用对齐 + 参考文献格式化
-```
-
-### 🚀 快速开始
-
-```bash
-git clone https://github.com/yourname/openoe-lite.git
-cd openoe-lite
-pip install -e .
-cp .env_template .env   # 编辑：填入 OPENROUTER_API_KEY
-python -m openoe        # 浏览器打开 http://localhost:8000
-```
-
-### ⚙️ 配置
-
-编辑 `openoe/config/pipeline.yaml` 自定义模型和各阶段参数。  
-所有模型通过 [OpenRouter](https://openrouter.ai/models) 调用，直接替换模型名即可切换。
-
-| 环境变量 | 必填 | 说明 |
-|---------|:----:|------|
-| `OPENROUTER_API_KEY` | ✅ | [获取 Key](https://openrouter.ai/keys) |
-| `OPENALEX_EMAIL` | | OpenAlex 礼貌池邮箱 |
-| `OPENOE_DEBUG` | | 设为 `true` 记录 LLM 完整请求/响应到 `logs/llm/` |
-
-### 📡 接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/` | 🖥️ Web 前端 |
-| `POST` | `/api/query` | RAG 问答 |
-| `WS` | `/ws/query` | 实时问答 (带进度推送) |
-| `GET` | `/api/sources` | 检索路线列表 |
-| `GET` | `/api/config` | 当前配置 (脱敏) |
-| `GET` | `/api/traces/{id}` | 执行轨迹 |
-| `GET` | `/health` | 健康检查 |
-
-### 🧩 Lite → Full 升级路线
-
-模块化架构让你可以逐步增强：
-
-- 🗄️ 接入本地论文数据库 (PostgreSQL + pgvector 全文/向量检索)
-- 📚 添加临床指南数据库 (chunk 级向量检索 + 段落提取)
-- 📥 构建 PubMed XML 数据灌入管线
-- 🤖 实现 Agentic RAG (多轮迭代检索)
-- 👤 添加用户系统 + 查询历史
+The original Medicap dashboard (`/app`) is still available with the leave-one-out evaluation: hide one seed, re-run, and check whether the graph recovers it.
 
 ---
 
-<a id="english"></a>
+## How the ranking works
 
-## 🌐 English
+Candidate papers come from independent signals:
 
-### ✨ Features
+| Signal | Source | What it finds |
+|---|---|---|
+| Cites / cited by / related | OpenAlex citation graph | Papers connected to several of your seeds |
+| Recommendations | Semantic Scholar | Papers recommended for the whole seed set |
+| Search | OpenAlex, PubMed | Papers for queries the LLM derives from your question and seeds |
+| Web | Tavily (scholarly domains) | Hits resolved to a real DOI or PMID and ranked like any other paper |
 
-- 🪶 **No Local Vector DB Needed** — No local corpus, no embedding preprocessing, no index building. Real-time retrieval from [OpenAlex](https://openalex.org)'s 250M+ open academic works — one API key, ready to go
-- 🔍 **Cross-Lingual 3-View Retrieval** — Chinese questions auto-generate: English search expression + natural language rewrite + HyDE hypothetical abstract. Three paths retrieve simultaneously, replacing local indexing with query-time augmentation
-- 🎯 **Small-Model Evidence Gating** — Cheap reasoning models concurrently review every candidate, keeping irrelevant papers out of the strong model's context. One extra step → fewer tokens, lower latency, better answers
-- 📝 **Grounded Answers** — Evidence-based structured responses with auto-reindexed citations aligned to source papers. Every conclusion is traceable
-- 🧩 **Lite Core, Full Ceiling** — Unified document model + 6-stage orchestrator + pluggable sources. Upgrade smoothly from zero-index to full RAG with local vector DB + clinical guidelines
+Every candidate is scored in two steps:
 
-> *"The shortest route was a detour. It was a detour that was our shortest path."*
-> — Gyro Zeppeli, **Lesson 5** (*JoJo's Bizarre Adventure Part 7: Steel Ball Run*)
->
-> Small-model filtering looks like a detour — but keeping noise out of the strong model's expensive context window actually saves both time and money.
+- **Pre-score** (signals only): 50% embedding similarity to the question and the seed centroid (Nebius `Qwen3-Embedding-8B`), 30% share of seeds linked by citation, 10% agreement across independent signals, 10% Semantic Scholar recommendation.
+- **AI relevance** (0–10): the top 25 candidates by pre-score are read by Nebius `Qwen3-235B`, which grades relevance against the question and seed titles, writes the one-sentence *why*, names the related seeds and extracts the study design as stated in the abstract.
 
-### 🏗️ Architecture
+**% match = 60% AI relevance + 40% pre-score.** The 20 best are shown; the breakdown is visible on every card.
 
-```
-Question (Chinese / English)
-  │
-  ├─ Stage 0: Safety Gate           lightweight LLM blocks non-medical / unsafe queries
-  ├─ Stage 1: 3-View Enhancement    search expression + English rewrite + HyDE hypothetical abstract
-  ├─ Stage 2: Open Academic Search   3 strategies retrieve from 250M+ papers
-  ├─ Stage 3: Dedup & Rank          DOI/title fuzzy dedup + RRF multi-path fusion
-  ├─ Stage 4: Evidence Gating       cheap models concurrent review ← the real shortcut
-  └─ Stage 5: Grounded Answer       strong model deep-read + citation alignment + reference formatting
-```
+Claims we keep honest, following the team's ranking analysis:
 
-### 🚀 Quick Start
+- Relevance is a gate. Quality only re-orders papers that are already relevant.
+- Citation counts reflect study type, not study quality; they are shown, not scored.
+- Automated quality or bias grading is not reliable enough to stand alone, so MedicUp says "traceable" and "explained", not "best evidence" or "verified quality".
+- Study-design labels are AI-extracted from the abstract and can be wrong; the retraction flag comes from OpenAlex metadata.
+
+---
+
+## Knowledge graph
+
+Today the citation layer is built and visible. The intended schema is a small scholarly ontology with the MeSH tree as taxonomy layer:
+
+- **Node types:** Paper, Concept (MeSH or topic), Author, Venue, WebSource, Figure, Run
+- **Link types:** CITES, SHARES_REFS_WITH, ABOUT, BROADER, SUPPORTED_BY, HAS_FIGURE, FOUND_BY, RANKED_IN
+
+The concept / MeSH view is proposed, not implemented.
+
+---
+
+## Quick start
 
 ```bash
-git clone https://github.com/yourname/openoe-lite.git
-cd openoe-lite
+git clone https://github.com/Fredo220/MedicUp.git
+cd MedicUp
 pip install -e .
-cp .env_template .env   # Edit: add OPENROUTER_API_KEY
-python -m openoe        # Open http://localhost:8000
+cp .env_template .env    # add NEBIUS_API_KEY and TAVILY_API_KEY
+openoe --port 8000       # open http://localhost:8000
 ```
 
-### ⚙️ Configuration
+Routes: `/` landing page, `/chat` the MedicUp chat, `/app` the Medicap dashboard, `/qa` the original OpenOE question-answering page, `/docs` the API.
 
-Edit `openoe/config/pipeline.yaml` to customize models and stages.  
-Models are accessed via [OpenRouter](https://openrouter.ai/models) — swap any model by name.
+### Configuration
 
 | Variable | Required | Description |
-|----------|:--------:|-------------|
-| `OPENROUTER_API_KEY` | ✅ | [Get your key](https://openrouter.ai/keys) |
-| `OPENALEX_EMAIL` | | Email for OpenAlex polite pool |
-| `OPENOE_DEBUG` | | `true` to log LLM requests to `logs/llm/` |
+|---|:---:|---|
+| `NEBIUS_API_KEY` | yes | Nebius Token Factory key: chat answers, follow-ups, embeddings, AI judge |
+| `TAVILY_API_KEY` | yes | Tavily: web discovery, web context, supporting sources, figures |
+| `OPENALEX_EMAIL` | | OpenAlex polite pool (also sent to PubMed E-utilities) |
+| `OPENALEX_API_KEY` | recommended | Without a key OpenAlex allows about 100 searches per day; after that MedicUp falls back to PubMed, and the citation signals are unavailable until midnight UTC |
+| `MEDICUP_SMALL_MODEL`, `MEDICUP_STRONG_MODEL`, `MEDICUP_EMBED_MODEL` | | Any Token Factory model ids (defaults: Qwen3-30B-A3B, Qwen3-235B-A22B, Qwen3-Embedding-8B) |
+| `OPENOE_DEBUG` | | `true` logs full LLM requests to `logs/llm/` |
 
-### 📡 API
+Models and stages are configured in `openoe/config/pipeline.yaml`, prompts in `openoe/config/prompts.yaml`.
+
+### API
 
 | Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/` | 🖥️ Web frontend |
-| `POST` | `/api/query` | RAG query |
-| `WS` | `/ws/query` | Real-time query with progress |
-| `GET` | `/api/sources` | Active retrieval routes |
-| `GET` | `/api/config` | Current config (redacted) |
-| `GET` | `/api/traces/{id}` | Execution trace |
-| `GET` | `/health` | Health check |
+|---|---|---|
+| `POST` | `/api/discover` | Discovery: `{question, seeds, disliked, limit}`; question or seeds required |
+| `WS` | `/ws/discover` | Same, with progress events |
+| `POST` | `/api/followup` | Cited answer + suggested follow-ups from a list of papers |
+| `POST` | `/api/query`, `WS /ws/query` | Original OpenOE question answering |
+| `POST` | `/api/medicap/resolve`, `/api/medicap/discover`, `/api/medicap/figures` | Medicap dashboard endpoints |
+| `GET` | `/api/config`, `/api/traces/{id}`, `/health` | Config (redacted), execution trace, health |
 
-### 🚢 Deploy on Nebius (Draft — to finalize)
-
-Build and push the image to Nebius Container Registry (authenticate Docker with your registry credentials first):
+### Tests
 
 ```bash
-docker build -t cr.<region>.nebius.cloud/<registry-id>/medicup:<tag> .
-docker push cr.<region>.nebius.cloud/<registry-id>/medicup:<tag>
+pip install -e ".[dev]"
+pytest -q
 ```
 
-Create a Nebius Serverless AI endpoint from this image, configure its container port as `8000`, and provide `NEBIUS_API_KEY`, `TAVILY_API_KEY`, `OPENALEX_EMAIL`, and `OPENALEX_API_KEY` as secret environment variables. Do not bake credentials into the image.
+---
 
-### 📁 Project Structure
+## Deploy on Nebius
+
+The app is one container (FastAPI + static frontend, port 8000, no credentials inside). The model endpoint is Nebius Token Factory, so the interface and backend run separately from the model, as the hackathon requires.
+
+```bash
+docker build -t medicup .
+docker run -p 8000:8000 --env-file .env medicup
+```
+
+On Nebius: push the image to a Container Registry, create a serverless container or VM from it with port `8000`, and set `NEBIUS_API_KEY`, `TAVILY_API_KEY`, `OPENALEX_EMAIL` and `OPENALEX_API_KEY` as secret environment variables.
+
+---
+
+## Project structure
 
 ```
 openoe/
-├── pipeline/          # 6 RAG stages (one file each)
-│   ├── safety.py      #   Stage 0: Safety classification
-│   ├── enhance.py     #   Stage 1: HyDE + translate + keywords
-│   ├── retrieval.py   #   Stage 2: Multi-source concurrent retrieval
-│   ├── merge.py       #   Stage 3: RRF fusion + dedup
-│   ├── filter.py      #   Stage 4: LLM relevance filter
-│   ├── answer.py      #   Stage 5: Answer + citation formatting
-│   └── orchestrator.py#   Wires stages 0→5 with progress callbacks
-├── sources/
-│   └── openalex.py    # OpenAlex 3-way search
-├── llm/
-│   ├── client.py      # Async LLM client (retry, reasoning control)
-│   └── prompts.py     # YAML prompt loading
-├── core/              # Config, models, tracing
-├── api/app.py         # FastAPI + WebSocket + frontend serving
-├── static/index.html  # Frontend (single-file, no build step)
-├── config/            # pipeline.yaml + prompts.yaml
-└── utils/             # Text cleaning + dedup
+├── discovery/          # Seed-based discovery
+│   ├── seeds.py        #   Resolve DOI / PMID / title / URL (OpenAlex, PubMed fallback)
+│   ├── candidates.py   #   Citation graph, Semantic Scholar, search, Tavily web signal
+│   ├── rank.py         #   Embeddings, pre-score, AI judge, study design
+│   ├── followup.py     #   Cited answers and suggested follow-ups
+│   ├── openalex.py / pubmed.py
+│   └── service.py      #   Orchestration
+├── medicap/            # Medicap dashboard backend (resolve, discover, LOO evaluation, figures)
+├── pipeline/           # Original OpenOE question-answering stages
+├── sources/            # OpenAlex and Tavily retrieval routes
+├── llm/                # Async Token Factory client, prompt loading
+├── api/app.py          # FastAPI, WebSockets, static routes
+├── static/
+│   ├── landing.html    # Landing page
+│   ├── index.html      # MedicUp chat
+│   └── medicap.html    # Medicap dashboard
+└── config/             # pipeline.yaml, prompts.yaml
 ```
-
-### 🧩 Lite → Full Upgrade Path
-
-The modular architecture lets you progressively enhance:
-
-- 🗄️ Add a local paper database (PostgreSQL + pgvector for full-text + vector search)
-- 📚 Add clinical guideline retrieval with chunk-level vector search
-- 📥 Build a PubMed XML ingestion pipeline
-- 🤖 Implement Agentic RAG (multi-round iterative retrieval)
-- 👤 Add user system + query history
 
 ---
 
-<div align="center">
+## Status and known limitations
 
-**MIT License** · Made for learning and sharing
+- Not yet deployed on Nebius; deployment needs a Nebius AI Cloud project and service account.
+- OpenAlex free quota is small; add `OPENALEX_API_KEY` for demos.
+- Figures depend on open-access sources; many papers have none.
+- The product name is MedicUp; the dashboard interface is still called Medicap.
 
-</div>
+---
+
+## Credits and licence
+
+Built on [OpenOE-Lite](https://github.com/wizardlancet/OpenOE-Lite) by wizardlancet (MIT). Data from [OpenAlex](https://openalex.org), [PubMed](https://pubmed.ncbi.nlm.nih.gov), [Semantic Scholar](https://www.semanticscholar.org) and [Tavily](https://www.tavily.com). Models served by [Nebius Token Factory](https://tokenfactory.nebius.com).
+
+MIT License. MedicUp is a research tool: it can make mistakes, check the sources, and it is not a substitute for clinical judgement.
